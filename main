@@ -1,0 +1,2920 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Faction & Player Tracker (Optimized - Individual Kill Credit)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/lucide-static@0.473.0/font/lucide.css" rel="stylesheet">
+
+    <style>
+        /* Add smooth scrolling behavior to the root */
+        html {
+            scroll-behavior: smooth;
+        }
+        /* Custom CSS - Mostly retained from original for consistency */
+        @font-face {
+            font-family: 'LucideIcons';
+            src: url(https://cdn.jsdelivr.net/npm/lucide-static@0.473.0/font/lucide.ttf) format('truetype');
+        }
+        .lucide {
+            font-family: 'LucideIcons';
+            font-size: 1.25rem; /* Adjust size as needed */
+            line-height: 1;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        .progress-bar-container {
+            background-color: #e0e0e0; border-radius: 0.5rem; overflow: hidden;
+            height: 2rem; display: flex; border: 1px solid #bdbdbd;
+        }
+        .progress-bar-segment {
+            height: 100%; display: flex; align-items: center; justify-content: center;
+            color: white; font-weight: bold; font-size: 0.875rem;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5); transition: width 0.5s ease-in-out;
+        }
+        .allies-bar { background-color: #2563eb; }
+        .axis-bar { background-color: #dc2626; }
+        .message-box {
+            position: fixed; bottom: 4rem; /* Adjusted for storage display */
+            left: 50%; transform: translateX(-50%);
+            padding: 0.75rem 1.5rem; border-radius: 0.375rem; color: white;
+            font-weight: 500; z-index: 100; /* Ensure above modals */
+            opacity: 0; transition: opacity 0.5s ease-in-out;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            pointer-events: none; /* Prevent interaction when hidden */
+        }
+        .message-box.show { opacity: 1; }
+        .message-box.success { background-color: #16a34a; }
+        .message-box.error { background-color: #dc2626; }
+        .message-box.info { background-color: #2563eb; }
+        .message-box.warning { background-color: #f59e0b; }
+
+        /* Multi-select Styling */
+        .multi-select-container { position: relative; }
+        .multi-select-selected { border: 1px solid #d1d5db; border-radius: 0.375rem; padding: 0.5rem; cursor: pointer; min-height: 38px; display: flex; flex-wrap: wrap; gap: 0.25rem; align-items: center;}
+        .multi-select-options {
+            display: none; position: absolute; background-color: white;
+            border: 1px solid #d1d5db; border-radius: 0.375rem; max-height: 150px;
+            overflow-y: auto; z-index: 70; /* Above content, below modals */
+            width: fit-content; min-width: 12rem; max-width: 24rem;
+            margin-top: 0.25rem; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .multi-select-options.show { display: block; }
+        .multi-select-options label { display: block; padding: 0.5rem; cursor: pointer; white-space: nowrap; }
+        .multi-select-options label:hover { background-color: #f3f4f6; }
+        .multi-select-options input[type="checkbox"] { margin-right: 0.5rem; }
+        .selected-badge { background-color: #e0e7ff; color: #3730a3; padding: 0.1rem 0.4rem; border-radius: 0.25rem; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.25rem;}
+        .remove-player-btn { background: none; border: none; color: #4f46e5; cursor: pointer; font-weight: bold; padding: 0;}
+
+        /* Editable name in Step 1 */
+        .editable-vehicle-name {
+            border: 1px solid transparent; padding: 0.1rem 0.25rem; border-radius: 0.25rem;
+            background-color: transparent; width: calc(100% - 25px); /* Adjust width */
+            transition: border-color 0.2s ease-in-out, background-color 0.2s ease-in-out;
+        }
+        .editable-vehicle-name:hover, .editable-vehicle-name:focus {
+            border-color: #a5b4fc; background-color: #fefefe;
+        }
+
+        /* Storage display Container */
+        #storage-display-container {
+            position: fixed; bottom: 0; left: 0; width: 100%;
+            background-color: #1f2937; color: #d1d5db; padding: 0.5rem 1rem;
+            font-size: 0.75rem; z-index: 40; display: flex;
+            justify-content: space-between; align-items: center; gap: 1rem;
+        }
+
+        /* Event Logging Buttons */
+        .event-btn {
+            padding: 0.25rem 0.5rem; font-size: 0.8rem; margin-left: 0.25rem;
+            border-radius: 0.25rem; transition: background-color 0.2s;
+        }
+        /* Keep loss button style */
+        .loss-btn { background-color: #e5e7eb; color: #374151; } .loss-btn:hover:not(:disabled) { background-color: #d1d5db; }
+
+        /* Modals */
+        .modal {
+            z-index: 60; background-color: rgba(0, 0, 0, 0.6);
+        }
+
+        /* Score Breakdown List */
+        .score-breakdown {
+            font-size: 0.875rem; max-height: 150px; overflow-y: auto; padding: 0.5rem;
+            border: 1px solid #e5e7eb; border-radius: 0.375rem; margin-top: 0.5rem;
+        }
+        .score-breakdown li { padding: 0.1rem 0; }
+        .score-breakdown .points-positive { color: #16a34a; }
+        .score-breakdown .points-negative { color: #dc2626; }
+
+        /* Clickable player name */
+        .player-name-link {
+            cursor: pointer; color: #4f46e5; text-decoration: underline;
+            font-weight: 500; background: none; border: none; padding: 0; text-align: left;
+        }
+        .player-name-link:hover { color: #3730a3; }
+
+        /* Profile Image */
+        #profile-player-image { cursor: move; transition: opacity 0.2s; }
+        #profile-player-image:hover { opacity: 0.8; }
+        .profile-image-container { position: relative; display: inline-block; width: 8rem; height: 8rem; }
+        #edit-image-url-btn {
+            position: absolute; top: 0; right: 0; background-color: rgba(255, 255, 255, 0.7);
+            border: none; border-radius: 50%; padding: 0.25rem; cursor: pointer; line-height: 1;
+            transition: background-color 0.2s;
+        }
+        #edit-image-url-btn:hover { background-color: rgba(229, 231, 235, 0.9); }
+        #edit-image-url-btn .lucide { font-size: 0.8rem; color: #374151; display: block; }
+
+        /* Image Position Modal */
+        #position-preview-img {
+            width: 150px; height: 150px; border-radius: 50%; object-fit: cover;
+            border: 2px solid #ccc; margin: 0 auto 1rem; display: block;
+        }
+        .slider-label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; color: #4b5563; }
+        .slider-label input[type="range"] { flex-grow: 1; }
+        .slider-label span { width: 3em; text-align: right; font-weight: 500; }
+
+        /* Award Images */
+        .award-image {
+            width: 1.75rem; height: 1.75rem; object-fit: contain; display: inline-block;
+            vertical-align: middle; margin-right: 0.25rem; border-radius: 0.25rem;
+        }
+        .award-image-small {
+            width: 1rem; height: 1rem; object-fit: contain; display: inline-block;
+            vertical-align: middle; margin: 0 1px; border-radius: 0.125rem;
+        }
+
+        /* Weapon Kill Stats Grid */
+        .weapon-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); /* Responsive columns */
+            gap: 0.75rem; /* gap-3 */
+            margin-top: 1rem; /* mt-4 */
+            padding-top: 1rem; /* pt-4 */
+            border-top: 1px solid #e5e7eb; /* border-t */
+        }
+        .weapon-stat-item {
+            background-color: #f9fafb; /* bg-gray-50 */
+            padding: 0.5rem; /* p-2 */
+            border-radius: 0.375rem; /* rounded-lg */
+            text-align: center;
+        }
+        .weapon-stat-item h4 {
+            font-size: 0.75rem; /* text-xs */
+            font-medium: 500; /* font-medium */
+            color: #6b7280; /* text-gray-500 */
+            margin-bottom: 0.1rem; /* mb-0.5 */
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .weapon-stat-item p {
+            font-size: 1.125rem; /* text-lg */
+            font-weight: 600; /* font-semibold */
+            color: #1f2937; /* text-neutral-dark */
+        }
+    </style>
+
+    <script>
+        // Tailwind Configuration
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        allies: '#2563eb',
+                        axis: '#dc2626',
+                        neutral: { light: '#f3f4f6', DEFAULT: '#6b7280', dark: '#1f2937' }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-neutral-light font-sans text-neutral-dark p-4 md:p-8 pb-20">
+    <div class="max-w-7xl mx-auto space-y-8">
+        <h1 id="main-title" class="text-3xl md:text-4xl font-bold text-center text-neutral-dark mb-6">Faction & Player Tracker (Optimized - Individual Kill Credit)</h1>
+
+        <div id="main-content">
+            <section class="bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-2xl font-semibold mb-4 text-center">Overall War Effort</h2>
+                <div class="progress-bar-container mb-2">
+                    <div id="allies-progress" class="progress-bar-segment allies-bar" style="width: 50%;">Allies</div>
+                    <div id="axis-progress" class="progress-bar-segment axis-bar" style="width: 50%;">Axis</div>
+                </div>
+                <div class="flex justify-between text-sm font-medium text-neutral-DEFAULT">
+                    <span id="allies-score-display">Allies: 0 Wins</span>
+                    <span id="axis-score-display">Axis: 0 Wins</span>
+                </div>
+                <p class="text-xs text-center text-neutral-DEFAULT mt-2"><span id="total-matches-display">0</span> Matches Logged.</p>
+            </section>
+
+            <section class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-xl font-semibold mb-4">Manage Players / Crews</h2>
+                    <div class="space-y-2 mb-4">
+                        <label for="new-player-name" class="block text-sm font-medium text-gray-700">Add New Player/Crew:</label>
+                        <input type="text" id="new-player-name" placeholder="Enter name" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 mb-2">
+                        <label for="new-player-image-url" class="block text-sm font-medium text-gray-700">Image URL (Optional):</label>
+                        <input type="url" id="new-player-image-url" placeholder="https://example.com/image.png" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 mb-2">
+                        <button id="add-player-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md transition duration-150 ease-in-out">Add Player</button>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Current Players:</label>
+                        <ul id="player-list" class="max-h-40 overflow-y-auto border rounded-md p-2 text-sm space-y-1">
+                            <li class="text-gray-500 italic">Loading players...</li>
+                        </ul>
+                    </div>
+                    <div class="flex space-x-2 mt-4">
+                        <button id="view-player-stats-btn" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md transition duration-150 ease-in-out">View Player Stats</button>
+                        <button id="view-awards-btn" class="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 px-4 rounded-md transition duration-150 ease-in-out">View Awards List</button>
+                    </div>
+                    <div class="mt-6 border-t pt-4">
+                        <h3 class="text-lg font-semibold mb-3">Manually Grant Award</h3>
+                        <div class="space-y-3">
+                            <div>
+                                <label for="manual-award-player-select" class="block text-sm font-medium text-gray-700 mb-1">Select Player:</label>
+                                <select id="manual-award-player-select" class="w-full p-2 border border-gray-300 rounded-md shadow-sm">
+                                    <option value="">-- Choose Player --</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="manual-award-select" class="block text-sm font-medium text-gray-700 mb-1">Select Award:</label>
+                                <select id="manual-award-select" class="w-full p-2 border border-gray-300 rounded-md shadow-sm">
+                                    <option value="">-- Choose Award --</option>
+                                </select>
+                            </div>
+                            <button id="grant-award-btn" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-md transition duration-150 ease-in-out">Grant Award</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-xl font-semibold mb-4">Manage Vehicles</h2>
+                    <div class="space-y-2 mb-4">
+                        <label for="new-vehicle-name" class="block text-sm font-medium text-gray-700">Add New Vehicle Type:</label>
+                        <div class="flex space-x-2">
+                            <input type="text" id="new-vehicle-name" placeholder="Enter vehicle name/type" class="w-full p-2 border border-gray-300 rounded-md shadow-sm">
+                            <button id="add-vehicle-btn" class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded-md transition duration-150 ease-in-out">Add</button>
+                        </div>
+                        <div class="mt-2">
+                            <label for="new-vehicle-category" class="block text-sm font-medium text-gray-700">Category:</label>
+                            <select id="new-vehicle-category" class="w-full p-2 border border-gray-300 rounded-md shadow-sm">
+                                <option value="">-- Select Category --</option>
+                                </select>
+                        </div>
+                        <div class="mt-2">
+                            <input type="checkbox" id="new-vehicle-is-ai" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                            <label for="new-vehicle-is-ai" class="ml-2 text-sm text-gray-600">Is AI Controlled?</label>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Available Vehicle Types:</label>
+                        <ul id="vehicle-list" class="max-h-40 overflow-y-auto border rounded-md p-2 text-sm space-y-1">
+                           <li class="text-gray-500 italic">Loading vehicles...</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <section id="log-match-section" class="bg-white p-6 rounded-lg shadow-md mt-8">
+                <h2 class="text-2xl font-semibold mb-4 text-center">Log New Match Details</h2>
+                <form id="log-match-form" class="space-y-6">
+                    <div id="step-1-vehicles" class="space-y-4">
+                        <h3 class="text-lg font-semibold border-b pb-2">Step 1: Select Participating Vehicles & Assign Names</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <h4 class="font-medium mb-2 text-allies">Allies Vehicles</h4>
+                                <div class="space-y-2">
+                                    <select id="allies-vehicle-select" class="w-full p-2 border border-gray-300 rounded-md shadow-sm">
+                                        <option value="">-- Select Vehicle Type --</option>
+                                    </select>
+                                    <button type="button" data-faction="Allies" class="add-vehicle-to-match-btn w-full bg-blue-500 hover:bg-blue-600 text-white py-1 px-3 rounded-md text-sm">Add to Match</button>
+                                </div>
+                                <ul id="allies-vehicles-in-match" class="mt-3 space-y-1 text-sm"></ul>
+                            </div>
+                            <div>
+                                <h4 class="font-medium mb-2 text-axis">Axis Vehicles</h4>
+                                <div class="space-y-2">
+                                    <select id="axis-vehicle-select" class="w-full p-2 border border-gray-300 rounded-md shadow-sm">
+                                        <option value="">-- Select Vehicle Type --</option>
+                                    </select>
+                                    <button type="button" data-faction="Axis" class="add-vehicle-to-match-btn w-full bg-red-500 hover:bg-red-600 text-white py-1 px-3 rounded-md text-sm">Add to Match</button>
+                                </div>
+                                <ul id="axis-vehicles-in-match" class="mt-3 space-y-1 text-sm"></ul>
+                            </div>
+                        </div>
+                        <button type="button" id="goto-step-2-btn" class="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md transition duration-150 ease-in-out mt-4">Next: Assign Crews (Optional)</button>
+                    </div>
+
+                    <div id="step-2-crews" class="space-y-4 hidden">
+                        <h3 class="text-lg font-semibold border-b pb-2">Step 2: Assign Crews to Vehicles (Optional)</h3>
+                        <div id="crew-assignment-area" class="space-y-4">
+                            </div>
+                        <div class="flex justify-between mt-4">
+                            <button type="button" data-target-step="1" class="nav-back-btn bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-md transition">Back</button>
+                            <button type="button" id="goto-step-3-btn" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md transition">Next: Log Events</button>
+                        </div>
+                    </div>
+
+                    <div id="step-3-performance" class="space-y-4 hidden">
+                        <h3 class="text-lg font-semibold border-b pb-2">Step 3: Log Match Events</h3>
+                        <div id="performance-logging-area" class="space-y-4">
+                            </div>
+                        <div class="flex justify-between mt-4">
+                            <button type="button" data-target-step="2" class="nav-back-btn bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-md transition">Back</button>
+                            <button type="button" id="goto-step-4-btn" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md transition">Next: View Score & Submit</button>
+                        </div>
+                    </div>
+
+                    <div id="step-4-outcome" class="space-y-4 hidden">
+                        <h3 class="text-lg font-semibold border-b pb-2">Step 4: Final Score & Submit</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-center">
+                            <div class="bg-blue-100 p-4 rounded">
+                                <h4 class="text-lg font-semibold text-allies mb-2">Allies Score</h4>
+                                <p id="final-allies-score" class="text-3xl font-bold">0</p>
+                                <ul id="allies-score-breakdown" class="score-breakdown text-left list-disc list-inside"></ul>
+                            </div>
+                            <div class="bg-red-100 p-4 rounded">
+                                <h4 class="text-lg font-semibold text-axis mb-2">Axis Score</h4>
+                                <p id="final-axis-score" class="text-3xl font-bold">0</p>
+                                <ul id="axis-score-breakdown" class="score-breakdown text-left list-disc list-inside"></ul>
+                            </div>
+                        </div>
+                        <div id="final-outcome-display" class="text-center text-xl font-bold mt-4 p-3 rounded bg-gray-200">
+                            Determining winner...
+                        </div>
+                        <div class="flex justify-between mt-6">
+                            <button type="button" data-target-step="3" class="nav-back-btn bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-md transition">Back</button>
+                            <button type="submit" class="w-full md:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-md transition duration-150 ease-in-out">Submit Match Log</button>
+                        </div>
+                    </div>
+                </form>
+            </section>
+
+            <section id="match-history-section" class="bg-white p-6 rounded-lg shadow-md mt-8">
+                <h2 class="text-xl font-semibold mb-4">Match History</h2>
+                <div id="match-history-display" class="space-y-4 max-h-96 overflow-y-auto">
+                    <p class="text-gray-500 italic">Loading match history...</p>
+                </div>
+            </section>
+        </div> <section id="awards-list-page" class="bg-white p-6 rounded-lg shadow-md hidden">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-semibold">Available Awards</h2>
+                <button id="back-to-main-from-awards" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-1 px-3 rounded-md transition text-sm">Back to Main</button>
+            </div>
+            <div id="awards-list-display" class="space-y-4">
+                </div>
+        </section>
+
+        <section id="player-stats-page" class="bg-white p-6 rounded-lg shadow-md hidden">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-semibold">Player Statistics</h2>
+                <button id="back-to-main-from-stats" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-1 px-3 rounded-md transition text-sm">Back to Main</button>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left text-gray-500">
+                    <thead class="text-xs text-gray-700 uppercase bg-gray-100">
+                        <tr>
+                            <th scope="col" class="px-4 py-2">Player</th>
+                            <th scope="col" class="px-4 py-2 text-center">PCS</th>
+                            <th scope="col" class="px-4 py-2 text-center">Matches</th>
+                            <th scope="col" class="px-4 py-2 text-center">W/L/D</th>
+                            <th scope="col" class="px-4 py-2 text-center">Affinity (Al/Ax)</th>
+                            <th scope="col" class="px-4 py-2 text-center">Kills (Contrib)</th>
+                            <th scope="col" class="px-4 py-2 text-center">Obj (Contrib)</th>
+                            <th scope="col" class="px-4 py-2 text-center">Losses (Suffered)</th>
+                            <th scope="col" class="px-4 py-2">Rewards</th>
+                        </tr>
+                    </thead>
+                    <tbody id="player-stats-table-body">
+                        </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="player-profile-page" class="bg-white p-6 rounded-lg shadow-md hidden">
+            <div class="flex justify-between items-center mb-6 border-b pb-3">
+                <h2 class="text-2xl font-semibold">Player Profile: <span id="profile-player-name" class="text-indigo-600"></span></h2>
+                <button id="back-to-stats-from-profile" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-1 px-3 rounded-md transition text-sm">Back to Stats</button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="md:col-span-1 flex flex-col items-center">
+                    <div class="profile-image-container mb-4">
+                        <img id="profile-player-image" src="https://placehold.co/128x128/e0e0e0/777777?text=No+Image" alt="Player Profile Image" title="Click to adjust image position" class="w-32 h-32 rounded-full object-cover border-4 border-gray-300">
+                        <button id="edit-image-url-btn" title="Edit Image URL">
+                            <span class="lucide">&#xA008;</span> </button>
+                    </div>
+                    <div id="profile-player-rewards" class="flex flex-wrap gap-2 justify-center items-center">
+                        </div>
+                </div>
+                <div class="md:col-span-2 space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-gray-100 p-3 rounded-lg text-center">
+                            <h3 class="text-sm font-medium text-gray-500 mb-1">PCS</h3>
+                            <p id="profile-player-pcs" class="text-2xl font-bold text-neutral-dark">0</p>
+                        </div>
+                        <div class="bg-gray-100 p-3 rounded-lg text-center">
+                            <h3 class="text-sm font-medium text-gray-500 mb-1">Matches Played</h3>
+                            <p id="profile-player-matches" class="text-2xl font-bold text-neutral-dark">0</p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-4">
+                        <div class="bg-gray-100 p-3 rounded-lg text-center">
+                            <h3 class="text-sm font-medium text-gray-500 mb-1">Wins</h3>
+                            <p id="profile-player-wins" class="text-xl font-semibold text-green-600">0</p>
+                        </div>
+                        <div class="bg-gray-100 p-3 rounded-lg text-center">
+                            <h3 class="text-sm font-medium text-gray-500 mb-1">Losses</h3>
+                            <p id="profile-player-losses" class="text-xl font-semibold text-red-600">0</p>
+                        </div>
+                        <div class="bg-gray-100 p-3 rounded-lg text-center">
+                            <h3 class="text-sm font-medium text-gray-500 mb-1">Draws</h3>
+                            <p id="profile-player-draws" class="text-xl font-semibold text-gray-600">0</p>
+                        </div>
+                    </div>
+                    <div class="bg-gray-100 p-3 rounded-lg text-center">
+                        <h3 class="text-sm font-medium text-gray-500 mb-1">Faction Affinity</h3>
+                        <div class="flex justify-around text-sm mt-1">
+                            <span id="profile-player-allies-affinity" class="text-allies font-semibold">Allies: 0%</span>
+                            <span id="profile-player-axis-affinity" class="text-axis font-semibold">Axis: 0%</span>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-4">
+                        <div class="bg-gray-100 p-3 rounded-lg text-center">
+                            <h3 class="text-sm font-medium text-gray-500 mb-1">Kills (Contrib.)</h3>
+                            <p id="profile-player-kills" class="text-xl font-semibold text-neutral-dark">0</p>
+                        </div>
+                        <div class="bg-gray-100 p-3 rounded-lg text-center">
+                            <h3 class="text-sm font-medium text-gray-500 mb-1">Objectives (Contrib.)</h3>
+                            <p id="profile-player-objectives" class="text-xl font-semibold text-neutral-dark">0</p>
+                        </div>
+                        <div class="bg-gray-100 p-3 rounded-lg text-center">
+                            <h3 class="text-sm font-medium text-gray-500 mb-1">Losses (Suffered)</h3>
+                            <p id="profile-player-vlosses" class="text-xl font-semibold text-neutral-dark">0</p>
+                        </div>
+                    </div>
+                    <div id="profile-weapon-stats" class="weapon-stats-grid">
+                        </div>
+                </div>
+            </div>
+            <div class="mt-8 flex justify-end">
+                <button id="delete-player-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-3 rounded-md transition text-sm">Delete Player</button>
+            </div>
+        </section>
+
+    </div> <div id="loss-attribution-modal" class="modal fixed inset-0 overflow-y-auto h-full w-full hidden items-center justify-center">
+        <div class="relative mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 class="text-lg font-semibold">Attribute Loss</h3>
+                <button data-modal-id="loss-attribution-modal" class="close-modal-btn text-gray-500 hover:text-gray-800 text-2xl font-bold">&times;</button>
+            </div>
+            <div class="mt-3 space-y-3">
+                <p>Who should be credited with the kill for the loss of <strong id="loss-modal-vehicle-name">Vehicle</strong>?</p>
+                <div>
+                    <label for="loss-credit-select" class="block text-sm font-medium text-gray-700 mb-1">Credit Kill To:</label>
+                    <select id="loss-credit-select" class="w-full p-2 border border-gray-300 rounded-md shadow-sm">
+                        <option value="">-- Unknown --</option>
+                        </select>
+                </div>
+                <div class="mt-2">
+                    <label for="loss-method-select" class="block text-sm font-medium text-gray-700 mb-1">Method:</label>
+                    <select id="loss-method-select" class="w-full p-2 border border-gray-300 rounded-md shadow-sm">
+                        </select>
+                </div>
+                <div class="flex justify-end space-x-2 pt-3">
+                    <button data-modal-id="loss-attribution-modal" type="button" class="cancel-modal-btn bg-gray-400 hover:bg-gray-500 text-white font-bold py-1 px-3 rounded-md transition text-sm">Cancel</button>
+                    <button id="confirm-loss-btn" type="button" class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-3 rounded-md transition text-sm">Confirm Loss</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="kill-target-modal" class="modal fixed inset-0 overflow-y-auto h-full w-full hidden items-center justify-center">
+        <div class="relative mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 class="text-lg font-semibold">Confirm Kill</h3>
+                <button data-modal-id="kill-target-modal" class="close-modal-btn text-gray-500 hover:text-gray-800 text-2xl font-bold">&times;</button>
+            </div>
+            <div class="mt-3 space-y-3">
+                <p>Which opposing vehicle was destroyed by <strong id="kill-modal-vehicle-name">Vehicle</strong>?</p>
+                <div>
+                    <label for="kill-target-select" class="block text-sm font-medium text-gray-700 mb-1">Target Destroyed:</label>
+                    <select id="kill-target-select" class="w-full p-2 border border-gray-300 rounded-md shadow-sm">
+                        <option value="">-- Select Target --</option>
+                    </select>
+                </div>
+                 <div class="mt-2">
+                    <label for="kill-method-select" class="block text-sm font-medium text-gray-700 mb-1">Method:</label>
+                    <select id="kill-method-select" class="w-full p-2 border border-gray-300 rounded-md shadow-sm">
+                        </select>
+                </div>
+                <div class="flex justify-end space-x-2 pt-3">
+                    <button data-modal-id="kill-target-modal" type="button" class="cancel-modal-btn bg-gray-400 hover:bg-gray-500 text-white font-bold py-1 px-3 rounded-md transition text-sm">Cancel</button>
+                    <button id="confirm-kill-btn" type="button" class="bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded-md transition text-sm">Confirm Kill</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="image-position-modal" class="modal fixed inset-0 overflow-y-auto h-full w-full hidden items-center justify-center">
+        <div class="relative mx-auto p-5 border w-full max-w-lg shadow-lg rounded-md bg-white">
+            <div class="flex justify-between items-center border-b pb-3 mb-4">
+                <h3 class="text-lg font-semibold">Adjust Image Position</h3>
+                <button data-modal-id="image-position-modal" class="close-modal-btn text-gray-500 hover:text-gray-800 text-2xl font-bold">&times;</button>
+            </div>
+            <div class="space-y-4">
+                <img id="position-preview-img" src="https://placehold.co/150x150/e0e0e0/777777?text=Preview" alt="Image Preview">
+                <div class="slider-label">
+                    <label for="image-pos-x" class="w-10">X:</label>
+                    <input type="range" id="image-pos-x" min="0" max="100" value="50" step="1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700">
+                    <span id="image-pos-x-value">50%</span>
+                </div>
+                <div class="slider-label">
+                    <label for="image-pos-y" class="w-10">Y:</label>
+                    <input type="range" id="image-pos-y" min="0" max="100" value="50" step="1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700">
+                    <span id="image-pos-y-value">50%</span>
+                </div>
+                <div class="flex justify-end space-x-2 pt-4 border-t mt-4">
+                    <button data-modal-id="image-position-modal" type="button" class="cancel-modal-btn bg-gray-400 hover:bg-gray-500 text-white font-bold py-1 px-3 rounded-md transition text-sm">Cancel</button>
+                    <button id="confirm-position-btn" type="button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded-md transition text-sm">Save Position</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="detection-modal" class="modal fixed inset-0 overflow-y-auto h-full w-full hidden items-center justify-center">
+        <div class="relative mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 class="text-lg font-semibold">Log Detection</h3>
+                <button data-modal-id="detection-modal" class="close-modal-btn text-gray-500 hover:text-gray-800 text-2xl font-bold">&times;</button>
+            </div>
+            <div class="mt-3 space-y-3">
+                <p>Which method was used by <strong id="detect-modal-vehicle-name">Vehicle</strong>?</p>
+                <div>
+                    <label for="detect-method-select" class="block text-sm font-medium text-gray-700 mb-1">Detection Method:</label>
+                    <select id="detect-method-select" class="w-full p-2 border border-gray-300 rounded-md shadow-sm">
+                        </select>
+                </div>
+                <div class="flex justify-end space-x-2 pt-3">
+                    <button data-modal-id="detection-modal" type="button" class="cancel-modal-btn bg-gray-400 hover:bg-gray-500 text-white font-bold py-1 px-3 rounded-md transition text-sm">Cancel</button>
+                    <button id="confirm-detect-btn" type="button" class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-1 px-3 rounded-md transition text-sm">Confirm Detection</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="message-box" class="message-box"></div>
+
+    <div id="storage-display-container">
+        <span id="storage-usage-text">Calculating storage...</span>
+        <div class="flex gap-2">
+            <button id="purge-matches-btn" class="bg-yellow-600 hover:bg-yellow-700 text-white text-xs font-bold py-1 px-2 rounded">
+                Purge Match History
+            </button>
+            <button id="purge-data-btn" class="bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-1 px-2 rounded">
+                Purge All Data
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // --- Constants and Configuration ---
+        const APP_VERSION = 'v18_opt_indiv_kill_credit'; // Updated version for localStorage keys
+        const PLAYERS_KEY = `factionTrackerPlayers_${APP_VERSION}`;
+        const VEHICLES_KEY = `factionTrackerVehicles_${APP_VERSION}`;
+        const MATCHES_KEY = `factionTrackerMatches_${APP_VERSION}`;
+        const STATS_KEY = `factionTrackerGlobalStats_${APP_VERSION}`;
+
+        const PCS_WIN_BONUS = 5;
+        const DEFAULT_AWARD_IMAGE_URL = 'https://i.imgur.com/42uxapt.png'; // Placeholder award image
+        const PLACEHOLDER_IMAGE_URL_PREFIX = 'https://placehold.co/128x128/e0e0e0/777777?text=';
+
+        // Preconfigured data (used if localStorage is empty)
+        const PRECONFIG_PLAYERS = [
+            { id: 'player_pre_1', name: 'Cmdr. Shepard', pcs: 100, flags: 0, rewards: [], imageUrl: null, imagePosition: '50% 50%' },
+            { id: 'player_pre_2', name: 'Garrus', pcs: 85, flags: 0, rewards: [], imageUrl: null, imagePosition: '50% 50%' },
+            { id: 'player_pre_3', name: 'Tali\'Zorah', pcs: 90, flags: 0, rewards: [], imageUrl: null, imagePosition: '50% 50%' },
+            { id: 'player_pre_4', name: 'Hans Gruber', pcs: 50, flags: 0, rewards: [], imageUrl: null, imagePosition: '50% 50%' },
+        ];
+        const PRECONFIG_VEHICLE_TYPES = [
+            { id: 'vtype_pre_1', name: 'Flower Class Corvette', isAi: false, category: 'sub chaser' },
+            { id: 'vtype_pre_2', name: 'Type VII U-Boat', isAi: false, category: 'sub' },
+            { id: 'vtype_pre_3', name: 'Liberty Ship', isAi: true, category: 'convoy' },
+            { id: 'vtype_pre_4', name: 'Fletcher Destroyer', isAi: false, category: 'destroyer' },
+            { id: 'vtype_pre_5', name: 'PBY Catalina', isAi: false, category: 'scout plane' },
+            { id: 'vtype_pre_6', name: 'F4F Wildcat', isAi: false, category: 'escort plane' },
+            { id: 'vtype_pre_7', name: 'Iowa Battleship', isAi: false, category: 'battleship'},
+            { id: 'vtype_pre_8', name: 'Essex Carrier', isAi: false, category: 'carrier'},
+        ];
+
+        // Faction scoring rules
+        const FACTION_SCORES = {
+            allies: {
+                destroy_sub: 5, escort_convoy_objective: 6, destroy_carrier: 10,
+                destroy_battleship: 10, destroy_destroyer: 2, destroy_escort_plane: 3,
+                destroy_scout_plane: 2, lose_convoy: -3, lose_sub_chaser: -4,
+                lose_carrier: -8, lose_battleship: -8, lose_destroyer: -1,
+                lose_escort_plane: -2, lose_scout_plane: -1,
+            },
+            axis: {
+                destroy_convoy: 5, destroy_sub_chaser: 2, destroy_carrier: 10,
+                destroy_battleship: 10, destroy_destroyer: 2, destroy_escort_plane: 3,
+                destroy_scout_plane: 2, lose_sub: -4,
+                lose_carrier: -8, lose_battleship: -8, lose_destroyer: -1,
+                lose_escort_plane: -2, lose_scout_plane: -1,
+            }
+        };
+
+        // Vehicle categories used for dropdowns and scoring logic
+        const VEHICLE_CATEGORIES = [
+            'convoy', 'sub chaser', 'scout plane', 'escort plane', 'sub',
+            'destroyer', 'battleship', 'carrier', 'other'
+        ];
+
+        // Kill/Loss/Detection Methods for dropdowns
+        const KILL_METHODS = [
+            'Torpedo', 'Deck Gun', 'Depth Charge', 'Hedgehog', 'Bomb',
+            'Aircraft Gun', 'Ramming', 'Collision', 'Other/Unknown'
+        ];
+        const DETECTION_METHODS = ['Sonar', 'Radar', 'Hydrophone', 'Visual', 'Other'];
+
+        // Award Definitions (simplified for brevity, kept structure)
+        const AWARDS_DEFINITIONS = {
+            'valor_bronze': { name: 'Bronze Star of Valor', category: 'Valor', isAutomatic: false, description: 'Single act of bravery.', criteriaType: 'manual', threshold: null, imageUrl: "https://i.imgur.com/VYBMkLr.png" },
+            'service_clasp_silver': { name: 'Service Clasp (Silver)', category: 'Progression', isAutomatic: true, description: 'Completed 15 missions.', criteriaType: 'matchesPlayed', threshold: 15, imageUrl: DEFAULT_AWARD_IMAGE_URL },
+            'torpedo_ace_5': { name: 'Torpedo Ace Tier 5', category: 'Combat', isAutomatic: true, description: 'Achieved 5 confirmed kills using Torpedoes.', criteriaType: 'kills_torpedo', threshold: 5, imageUrl: DEFAULT_AWARD_IMAGE_URL },
+            // ... Add ALL other award definitions from the original code here ...
+            'convoy_interceptor': { name: 'Convoy Interceptor Citation', category: 'Naval Combat', isAutomatic: false, description: 'Sank multiple convoy ships in a single mission.', criteriaType: 'manual', threshold: null, imageUrl: DEFAULT_AWARD_IMAGE_URL },
+        };
+
+        // --- State Management ---
+        let state = {
+            players: {},
+            vehicles: {},
+            matches: [],
+            globalStats: { alliesWins: 0, axisWins: 0, totalMatches: 0, lastConvoyNum: 0 },
+            currentMatch: { alliesVehicles: [], axisVehicles: [], events: [] },
+            modalState: { // Store state related to active modals
+                vehicleToAttributeLoss: null,
+                vehicleToAttributeKill: null,
+                vehicleToLogDetection: null,
+                currentlyViewedPlayerId: null,
+            },
+            ui: { // Store UI related state
+                currentStep: 1,
+                currentPage: 'MAIN', // MAIN, STATS, PROFILE, AWARDS
+                messageTimeout: null,
+            }
+        };
+
+        // --- DOM Element Caching ---
+        // Cache frequently accessed elements on load
+        const dom = {};
+        function cacheDOMElements() {
+            // Main Page Elements
+            dom.mainTitle = document.getElementById('main-title');
+            dom.mainContentDiv = document.getElementById('main-content');
+            dom.alliesProgress = document.getElementById('allies-progress');
+            dom.axisProgress = document.getElementById('axis-progress');
+            dom.alliesScoreDisplay = document.getElementById('allies-score-display');
+            dom.axisScoreDisplay = document.getElementById('axis-score-display');
+            dom.totalMatchesDisplay = document.getElementById('total-matches-display');
+            // Player Management
+            dom.newPlayerNameInput = document.getElementById('new-player-name');
+            dom.newPlayerImageUrlInput = document.getElementById('new-player-image-url');
+            dom.addPlayerBtn = document.getElementById('add-player-btn');
+            dom.playerList = document.getElementById('player-list');
+            dom.viewPlayerStatsBtn = document.getElementById('view-player-stats-btn');
+            dom.viewAwardsBtn = document.getElementById('view-awards-btn');
+            // Vehicle Management
+            dom.newVehicleNameInput = document.getElementById('new-vehicle-name');
+            dom.newVehicleCategorySelect = document.getElementById('new-vehicle-category');
+            dom.newVehicleIsAiCheckbox = document.getElementById('new-vehicle-is-ai');
+            dom.addVehicleBtn = document.getElementById('add-vehicle-btn');
+            dom.vehicleList = document.getElementById('vehicle-list');
+            // Manual Award
+            dom.manualAwardPlayerSelect = document.getElementById('manual-award-player-select');
+            dom.manualAwardSelect = document.getElementById('manual-award-select');
+            dom.grantAwardBtn = document.getElementById('grant-award-btn');
+            // Match Logging Form & Steps
+            dom.logMatchSection = document.getElementById('log-match-section');
+            dom.logMatchForm = document.getElementById('log-match-form');
+            dom.step1Div = document.getElementById('step-1-vehicles');
+            dom.step2Div = document.getElementById('step-2-crews');
+            dom.step3Div = document.getElementById('step-3-performance');
+            dom.step4Div = document.getElementById('step-4-outcome');
+            // Step 1 Elements
+            dom.alliesVehicleSelect = document.getElementById('allies-vehicle-select');
+            dom.alliesVehiclesInMatchList = document.getElementById('allies-vehicles-in-match');
+            dom.axisVehicleSelect = document.getElementById('axis-vehicle-select');
+            dom.axisVehiclesInMatchList = document.getElementById('axis-vehicles-in-match');
+            // Step 2 Elements
+            dom.crewAssignmentArea = document.getElementById('crew-assignment-area');
+            // Step 3 Elements
+            dom.performanceLoggingArea = document.getElementById('performance-logging-area');
+            // Step 4 Elements
+            dom.finalAlliesScoreDisplay = document.getElementById('final-allies-score');
+            dom.finalAxisScoreDisplay = document.getElementById('final-axis-score');
+            dom.finalOutcomeDisplay = document.getElementById('final-outcome-display');
+            dom.alliesScoreBreakdownList = document.getElementById('allies-score-breakdown');
+            dom.axisScoreBreakdownList = document.getElementById('axis-score-breakdown');
+            // Navigation Buttons
+            dom.gotoStep2Btn = document.getElementById('goto-step-2-btn');
+            dom.gotoStep3Btn = document.getElementById('goto-step-3-btn');
+            dom.gotoStep4Btn = document.getElementById('goto-step-4-btn');
+            // Match History
+            dom.matchHistorySection = document.getElementById('match-history-section');
+            dom.matchHistoryDisplay = document.getElementById('match-history-display');
+            // Awards List Page
+            dom.awardsListPage = document.getElementById('awards-list-page');
+            dom.awardsListDisplay = document.getElementById('awards-list-display');
+            dom.backToMainFromAwardsBtn = document.getElementById('back-to-main-from-awards');
+            // Player Stats Page
+            dom.playerStatsPage = document.getElementById('player-stats-page');
+            dom.playerStatsTableBody = document.getElementById('player-stats-table-body');
+            dom.backToMainFromStatsBtn = document.getElementById('back-to-main-from-stats');
+            // Player Profile Page
+            dom.playerProfilePage = document.getElementById('player-profile-page');
+            dom.profilePlayerName = document.getElementById('profile-player-name');
+            dom.profilePlayerImage = document.getElementById('profile-player-image');
+            dom.editImageUrlBtn = document.getElementById('edit-image-url-btn');
+            dom.profilePlayerRewards = document.getElementById('profile-player-rewards');
+            dom.profilePlayerPcs = document.getElementById('profile-player-pcs');
+            dom.profilePlayerMatches = document.getElementById('profile-player-matches');
+            dom.profilePlayerWins = document.getElementById('profile-player-wins');
+            dom.profilePlayerLosses = document.getElementById('profile-player-losses');
+            dom.profilePlayerDraws = document.getElementById('profile-player-draws');
+            dom.profilePlayerAlliesAffinity = document.getElementById('profile-player-allies-affinity');
+            dom.profilePlayerAxisAffinity = document.getElementById('profile-player-axis-affinity');
+            dom.profilePlayerKills = document.getElementById('profile-player-kills');
+            dom.profilePlayerObjectives = document.getElementById('profile-player-objectives');
+            dom.profilePlayerVLosses = document.getElementById('profile-player-vlosses');
+            dom.profileWeaponStats = document.getElementById('profile-weapon-stats'); // Added Weapon Stats container
+            dom.backToStatsFromProfileBtn = document.getElementById('back-to-stats-from-profile');
+            dom.deletePlayerBtn = document.getElementById('delete-player-btn');
+            // Modals
+            dom.lossAttributionModal = document.getElementById('loss-attribution-modal');
+            dom.lossModalVehicleName = document.getElementById('loss-modal-vehicle-name');
+            dom.lossCreditSelect = document.getElementById('loss-credit-select');
+            dom.lossMethodSelect = document.getElementById('loss-method-select');
+            dom.confirmLossBtn = document.getElementById('confirm-loss-btn');
+            dom.killTargetModal = document.getElementById('kill-target-modal');
+            dom.killModalVehicleName = document.getElementById('kill-modal-vehicle-name');
+            dom.killTargetSelect = document.getElementById('kill-target-select');
+            dom.killMethodSelect = document.getElementById('kill-method-select');
+            dom.confirmKillBtn = document.getElementById('confirm-kill-btn');
+            dom.imagePositionModal = document.getElementById('image-position-modal');
+            dom.positionPreviewImg = document.getElementById('position-preview-img');
+            dom.imagePosXSlider = document.getElementById('image-pos-x');
+            dom.imagePosYSlider = document.getElementById('image-pos-y');
+            dom.imagePosXValue = document.getElementById('image-pos-x-value');
+            dom.imagePosYValue = document.getElementById('image-pos-y-value');
+            dom.confirmPositionBtn = document.getElementById('confirm-position-btn');
+            dom.detectionModal = document.getElementById('detection-modal');
+            dom.detectModalVehicleName = document.getElementById('detect-modal-vehicle-name');
+            dom.detectMethodSelect = document.getElementById('detect-method-select');
+            dom.confirmDetectBtn = document.getElementById('confirm-detect-btn');
+            // Footer/Misc
+            dom.messageBox = document.getElementById('message-box');
+            dom.storageUsageText = document.getElementById('storage-usage-text');
+            dom.purgeDataBtn = document.getElementById('purge-data-btn');
+            dom.purgeMatchesBtn = document.getElementById('purge-matches-btn');
+        }
+
+        // --- Utility Functions ---
+
+        /**
+         * Safely retrieves data from localStorage.
+         * @param {string} key - The localStorage key.
+         * @param {*} defaultValue - The value to return if parsing fails or key not found.
+         * @returns {*} The parsed data or the default value.
+         */
+        function loadFromStorage(key, defaultValue) {
+            const storedValue = localStorage.getItem(key);
+            if (storedValue) {
+                try {
+                    const parsed = JSON.parse(storedValue);
+                    // Basic validation for objects to prevent returning null/empty objects incorrectly
+                    if (typeof defaultValue === 'object' && defaultValue !== null && !Array.isArray(defaultValue)) {
+                        if (typeof parsed === 'object' && parsed !== null && Object.keys(parsed).length > 0) {
+                            return parsed;
+                        }
+                    } else {
+                        return parsed;
+                    }
+                } catch (e) {
+                    console.error(`Error parsing localStorage key "${key}":`, e);
+                }
+            }
+            return defaultValue;
+        }
+
+        /**
+         * Safely saves data to localStorage.
+         * @param {string} key - The localStorage key.
+         * @param {*} value - The value to save.
+         */
+        function saveToStorage(key, value) {
+            try {
+                localStorage.setItem(key, JSON.stringify(value));
+            } catch (e) {
+                console.error(`Error saving to localStorage key "${key}":`, e);
+                showMessage('Error saving data. Storage might be full.', 'error', 5000);
+            }
+        }
+
+        /**
+         * Displays a temporary message to the user.
+         * @param {string} message - The message text.
+         * @param {'info'|'success'|'warning'|'error'} type - The message type.
+         * @param {number} duration - How long the message should be visible (ms).
+         */
+        function showMessage(message, type = 'info', duration = 3000) {
+            if (!dom.messageBox) return;
+            dom.messageBox.textContent = message;
+            dom.messageBox.className = `message-box ${type} show`; // Apply type and show classes
+            clearTimeout(state.ui.messageTimeout); // Clear previous timeout
+            state.ui.messageTimeout = setTimeout(() => {
+                dom.messageBox.classList.remove('show');
+            }, duration);
+        }
+
+        /**
+         * Generates a simple unique ID.
+         * @param {string} prefix - A prefix for the ID (e.g., 'player', 'match').
+         * @returns {string} A unique ID string.
+         */
+        function generateUniqueId(prefix = 'id') {
+            return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
+        }
+
+        /**
+         * Populates a select dropdown with options.
+         * @param {HTMLSelectElement} selectElement - The select element to populate.
+         * @param {Array<object>} options - Array of { value: string, text: string, dataset: object } objects.
+         * @param {string} [defaultOptionText] - Text for the initial disabled option (optional).
+         */
+        function populateSelect(selectElement, options, defaultOptionText) {
+            if (!selectElement) return;
+            selectElement.innerHTML = ''; // Clear existing options
+            if (defaultOptionText) {
+                const defaultOpt = document.createElement('option');
+                defaultOpt.value = '';
+                defaultOpt.textContent = defaultOptionText;
+                // defaultOpt.disabled = true; // Keep it selectable but represent 'none'
+                selectElement.appendChild(defaultOpt);
+            }
+            options.forEach(optData => {
+                const option = document.createElement('option');
+                option.value = optData.value;
+                option.textContent = optData.text;
+                // Add data attributes if provided
+                if (optData.dataset) {
+                    Object.entries(optData.dataset).forEach(([key, value]) => {
+                        option.dataset[key] = value;
+                    });
+                }
+                selectElement.appendChild(option);
+            });
+        }
+
+        /**
+         * Gets the display name for a player ID.
+         * @param {string} playerId - The ID of the player.
+         * @returns {string} The player's name or 'Unknown Player'.
+         */
+        function getPlayerName(playerId) {
+            return state.players[playerId]?.name || 'Unknown Player';
+        }
+
+        /**
+         * Gets the display name for a vehicle type ID.
+         * @param {string} vehicleTypeId - The ID of the vehicle type.
+         * @returns {string} The vehicle type's name or 'Unknown Type'.
+         */
+        function getVehicleTypeName(vehicleTypeId) {
+            return state.vehicles[vehicleTypeId]?.name || 'Unknown Type';
+        }
+
+        /**
+         * Gets the display name for a specific vehicle instance within the current match.
+         * @param {string} uniqueVehicleId - The unique ID of the vehicle in the match.
+         * @returns {string} The vehicle's assigned name or 'Unknown Vehicle'.
+         */
+        function getVehicleInstanceName(uniqueVehicleId) {
+            const vehicle = [...state.currentMatch.alliesVehicles, ...state.currentMatch.axisVehicles]
+                            .find(v => v.uniqueId === uniqueVehicleId);
+            return vehicle?.name || 'Unknown Vehicle';
+        }
+
+        /**
+         * Gets the category for a specific vehicle instance within the current match.
+         * @param {string} uniqueVehicleId - The unique ID of the vehicle in the match.
+         * @returns {string|null} The vehicle's category or null if not found.
+         */
+        function getVehicleInstanceCategory(uniqueVehicleId) {
+            const vehicleSetup = [...state.currentMatch.alliesVehicles, ...state.currentMatch.axisVehicles]
+                                .find(v => v.uniqueId === uniqueVehicleId);
+            if (!vehicleSetup) return null;
+            const vehicleType = state.vehicles[vehicleSetup.typeId];
+            return vehicleType?.category || null;
+        }
+
+        /**
+         * Creates a placeholder image URL.
+         * @param {string} text - Text to display on the placeholder.
+         * @returns {string} The placeholder image URL.
+         */
+        function createPlaceholderImageUrl(text = 'N/A') {
+            const displayText = text.substring(0, 2).toUpperCase();
+            return `${PLACEHOLDER_IMAGE_URL_PREFIX}${displayText}`;
+        }
+
+        // --- State Loading and Saving ---
+
+        /** Loads the application state from localStorage or uses preconfigured defaults. */
+        function loadState() {
+            // Load players, ensuring structure and fallback
+            const storedPlayers = loadFromStorage(PLAYERS_KEY, {});
+            if (Object.keys(storedPlayers).length > 0) {
+                state.players = storedPlayers;
+                // Ensure necessary fields exist on loaded players
+                Object.values(state.players).forEach(p => {
+                    p.imagePosition = p.imagePosition || '50% 50%';
+                    p.rewards = p.rewards || [];
+                    p.pcs = p.pcs || 0; // Ensure PCS exists
+                });
+            } else {
+                // Use preconfigured players if storage is empty/invalid
+                PRECONFIG_PLAYERS.forEach(p => { state.players[p.id] = { ...p }; });
+            }
+
+            // Load vehicles, ensuring structure and fallback
+            const storedVehicles = loadFromStorage(VEHICLES_KEY, {});
+            if (Object.keys(storedVehicles).length > 0) {
+                state.vehicles = storedVehicles;
+            } else {
+                // Use preconfigured vehicles if storage is empty/invalid
+                PRECONFIG_VEHICLE_TYPES.forEach(v => { state.vehicles[v.id] = { ...v }; });
+            }
+
+            // Load matches and global stats
+            state.matches = loadFromStorage(MATCHES_KEY, []);
+            state.globalStats = loadFromStorage(STATS_KEY, { alliesWins: 0, axisWins: 0, totalMatches: 0, lastConvoyNum: 0 });
+
+            console.log("State loaded:", state);
+        }
+
+        /** Saves the current application state to localStorage. */
+        function saveState() {
+            saveToStorage(PLAYERS_KEY, state.players);
+            saveToStorage(VEHICLES_KEY, state.vehicles);
+            saveToStorage(MATCHES_KEY, state.matches);
+            saveToStorage(STATS_KEY, state.globalStats);
+            updateStorageUsageDisplay(); // Update storage display after saving
+            console.log("State saved.");
+        }
+
+        // --- UI Update Functions ---
+
+        /** Updates the list of players in the "Manage Players" section. */
+        function updatePlayerList() {
+            if (!dom.playerList) return;
+            dom.playerList.innerHTML = ''; // Clear existing list
+            const playerArr = Object.values(state.players).sort((a, b) => a.name.localeCompare(b.name));
+
+            if (playerArr.length === 0) {
+                dom.playerList.innerHTML = '<li class="text-gray-500 italic">No players added yet.</li>';
+                return;
+            }
+
+            const fragment = document.createDocumentFragment();
+            playerArr.forEach(player => {
+                const li = document.createElement('li');
+                li.className = 'flex justify-between items-center';
+                const nameButton = document.createElement('button');
+                nameButton.type = 'button';
+                nameButton.className = 'player-name-link text-left';
+                nameButton.textContent = player.name;
+                nameButton.dataset.playerId = player.id; // Store ID for click handler
+                li.appendChild(nameButton);
+                fragment.appendChild(li);
+            });
+            dom.playerList.appendChild(fragment);
+        }
+
+        /** Updates the list of vehicle types in the "Manage Vehicles" section. */
+        function updateVehicleList() {
+            if (!dom.vehicleList) return;
+            dom.vehicleList.innerHTML = ''; // Clear existing list
+            const vehicleArr = Object.values(state.vehicles).sort((a, b) => a.name.localeCompare(b.name));
+
+            if (vehicleArr.length === 0) {
+                dom.vehicleList.innerHTML = '<li class="text-gray-500 italic">No vehicle types added yet.</li>';
+                return;
+            }
+
+            const fragment = document.createDocumentFragment();
+            vehicleArr.forEach(vehicle => {
+                const li = document.createElement('li');
+                const categoryText = vehicle.category ? `[${vehicle.category}]` : '[No Category]';
+                li.textContent = `${vehicle.name} ${categoryText} ${vehicle.isAi ? '(AI)' : ''}`;
+                fragment.appendChild(li);
+            });
+            dom.vehicleList.appendChild(fragment);
+        }
+
+        /** Updates the vehicle selection dropdowns in Step 1. */
+        function updateVehicleTypeSelects() {
+            const selects = [dom.alliesVehicleSelect, dom.axisVehicleSelect];
+            const vehicleOptions = Object.values(state.vehicles)
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map(vehicle => ({
+                    value: vehicle.id,
+                    text: `${vehicle.name} ${vehicle.isAi ? '(AI)' : ''}`,
+                    dataset: { isAi: vehicle.isAi, name: vehicle.name }
+                }));
+
+            selects.forEach(select => {
+                populateSelect(select, vehicleOptions, '-- Select Vehicle Type --');
+            });
+        }
+
+        /** Updates the overall faction progress bar and win counts. */
+        function updateFactionProgress() {
+            // Recalculate wins based on the matches array for accuracy
+            const alliesWins = state.matches.filter(m => m.outcome === 'Allies').length;
+            const axisWins = state.matches.filter(m => m.outcome === 'Axis').length;
+            const totalMatches = state.matches.length;
+
+            // Update globalStats (might differ slightly if loaded stats were inconsistent)
+            state.globalStats.alliesWins = alliesWins;
+            state.globalStats.axisWins = axisWins;
+            state.globalStats.totalMatches = totalMatches;
+
+            const totalWins = alliesWins + axisWins;
+            let alliesPercent = 50;
+            let axisPercent = 50;
+            if (totalWins > 0) {
+                alliesPercent = Math.round((alliesWins / totalWins) * 100);
+                axisPercent = 100 - alliesPercent;
+            }
+
+            // Update UI elements
+            if (dom.alliesProgress) dom.alliesProgress.style.width = `${alliesPercent}%`;
+            if (dom.axisProgress) dom.axisProgress.style.width = `${axisPercent}%`;
+            if (dom.alliesScoreDisplay) dom.alliesScoreDisplay.textContent = `Allies: ${alliesWins} Wins`;
+            if (dom.axisScoreDisplay) dom.axisScoreDisplay.textContent = `Axis: ${axisWins} Wins`;
+            if (dom.totalMatchesDisplay) dom.totalMatchesDisplay.textContent = totalMatches;
+        }
+
+        /** Updates the display of logged matches in the "Match History" section. */
+        function updateMatchHistoryDisplay() {
+             if (!dom.matchHistoryDisplay) return;
+            dom.matchHistoryDisplay.innerHTML = ''; // Clear previous content
+
+            if (state.matches.length === 0) {
+                dom.matchHistoryDisplay.innerHTML = '<p class="text-gray-500 italic">No matches logged yet.</p>';
+                return;
+            }
+
+            const fragment = document.createDocumentFragment();
+            // Display matches in reverse chronological order (newest first)
+            [...state.matches].reverse().forEach(match => {
+                const matchDiv = document.createElement('div');
+                matchDiv.className = 'border rounded-lg p-4 bg-gray-50 shadow-sm';
+
+                // --- Recalculate K/O/L stats specifically for this match's display ---
+                // This ensures the history reflects the state *at the time the match was logged*
+                const vehicleStats = {};
+                const allVehiclesInThisMatch = [...match.alliesVehicles, ...match.axisVehicles];
+                allVehiclesInThisMatch.forEach(v => {
+                    vehicleStats[v.uniqueId] = {
+                        name: v.name,
+                        crew: v.crew,
+                        isAi: v.isAi,
+                        kills: 0,
+                        objectives: 0,
+                        losses: 0,
+                        creditedLossesTo: [] // Store uniqueId(s) of who destroyed this vehicle
+                    };
+                });
+
+                (match.events || []).forEach(event => {
+                    if (event.type === 'LOSS') {
+                        // Increment loss count for the vehicle that was lost
+                        if (vehicleStats[event.vehicleId]) {
+                            vehicleStats[event.vehicleId].losses++;
+                        }
+                        // Increment kill count for the vehicle credited (if any)
+                        // Check both creditedPlayerId and creditedTo (vehicle)
+                        const creditedVehicle = event.creditedTo ? vehicleStats[event.creditedTo] : null;
+                        if(creditedVehicle) {
+                            creditedVehicle.kills++;
+                            if (vehicleStats[event.vehicleId]) {
+                                // Store vehicle ID even if a specific player got credit, for the history display
+                                vehicleStats[event.vehicleId].creditedLossesTo.push(event.creditedTo);
+                            }
+                        }
+                    } else if (event.type === 'OBJECTIVE') {
+                        // Increment objective count for the vehicle that achieved it
+                        if (vehicleStats[event.vehicleId]) {
+                            vehicleStats[event.vehicleId].objectives++;
+                        }
+                    }
+                    // Add handling for other event types if needed for display (e.g., DETECT)
+                });
+                // --- End Recalculation ---
+
+                // Helper to get opponent name for loss credit display within this match context
+                const getOpponentName = (uniqueId) => vehicleStats[uniqueId]?.name || 'Unknown';
+
+                // Generate HTML list items for vehicles
+                const generateVehicleHtml = (vehicleArray) => {
+                    return vehicleArray.map(v => {
+                        const stats = vehicleStats[v.uniqueId] || { kills: 0, objectives: 0, losses: 0, creditedLossesTo: [] };
+                        const crewNames = (v.crew || []).map(pid => state.players[pid]?.name || '?').join(', ');
+                        const crewText = crewNames ? `(${crewNames})` : (v.isAi ? '(AI)' : '(Uncrewed)');
+                        const lossCreditText = stats.creditedLossesTo.length > 0
+                            ? ` <span class="text-xs text-red-600">(Lost to: ${stats.creditedLossesTo.map(getOpponentName).join(', ')})</span>`
+                            : '';
+                        return `<li>${v.name} ${crewText} - K:${stats.kills} O:${stats.objectives} L:${stats.losses}${lossCreditText}</li>`;
+                    }).join('') || '<li>None</li>';
+                };
+
+                const alliesHtml = generateVehicleHtml(match.alliesVehicles);
+                const axisHtml = generateVehicleHtml(match.axisVehicles);
+                const scores = match.scores || { allies: 'N/A', axis: 'N/A' };
+                const outcomeClass = match.outcome === 'Allies' ? 'text-allies' : match.outcome === 'Axis' ? 'text-axis' : 'text-neutral-DEFAULT';
+                const outcomeText = match.outcome === 'Draw' ? 'Draw' : `${match.outcome} Win`;
+
+                matchDiv.innerHTML = `
+                    <div class="flex justify-between items-center mb-2 border-b pb-1">
+                        <h4 class="font-semibold">Match #${match.matchId.split('_')[1]}</h4>
+                        <span class="text-xs text-gray-500">${new Date(match.timestamp).toLocaleString()}</span>
+                    </div>
+                    <div class="text-center mb-2 text-sm">
+                        <span class="font-medium text-allies">Allies Score: ${scores.allies}</span> |
+                        <span class="font-medium text-axis">Axis Score: ${scores.axis}</span>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-2">
+                        <div><strong class="text-allies">Allies:</strong><ul class="list-disc list-inside ml-2">${alliesHtml}</ul></div>
+                        <div><strong class="text-axis">Axis:</strong><ul class="list-disc list-inside ml-2">${axisHtml}</ul></div>
+                    </div>
+                    <p class="text-center font-semibold text-lg mt-2">Outcome: <span class="${outcomeClass}">${outcomeText}</span></p>
+                `;
+                fragment.appendChild(matchDiv);
+            });
+            dom.matchHistoryDisplay.appendChild(fragment);
+        }
+
+
+        /** Updates the display of estimated localStorage usage. */
+        function updateStorageUsageDisplay() {
+            if (!dom.storageUsageText) return;
+            let totalBytes = 0;
+            const keys = [PLAYERS_KEY, VEHICLES_KEY, MATCHES_KEY, STATS_KEY];
+            keys.forEach(key => {
+                const item = localStorage.getItem(key);
+                if (item) {
+                    totalBytes += item.length * 2; // Estimate bytes (UTF-16)
+                }
+            });
+            let usageText;
+            if (totalBytes < 1024) usageText = `${totalBytes} Bytes`;
+            else if (totalBytes < 1024 * 1024) usageText = `${(totalBytes / 1024).toFixed(2)} KB`;
+            else usageText = `${(totalBytes / (1024 * 1024)).toFixed(2)} MB`;
+            dom.storageUsageText.textContent = `Est. Storage Usage: ${usageText}`;
+        }
+
+        /** Populates dropdowns related to manual award granting. */
+        function populateManualAwardUI() {
+            const playerOptions = Object.values(state.players)
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map(p => ({ value: p.id, text: p.name }));
+
+            const awardOptions = Object.values(AWARDS_DEFINITIONS)
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map(award => ({
+                    value: award.name, // Use name as value
+                    text: `${award.name} ${award.isAutomatic ? '(Auto)' : '(Manual)'}`
+                }));
+
+            populateSelect(dom.manualAwardPlayerSelect, playerOptions, '-- Choose Player --');
+            populateSelect(dom.manualAwardSelect, awardOptions, '-- Choose Award --');
+        }
+
+        /** Populates dropdowns for kill/loss/detection methods in modals. */
+        function populateMethodSelects() {
+            const killLossOptions = KILL_METHODS.map(m => ({ value: m, text: m }));
+            const detectOptions = DETECTION_METHODS.map(m => ({ value: m, text: m }));
+
+            populateSelect(dom.lossMethodSelect, killLossOptions, '-- Select Method --');
+            populateSelect(dom.killMethodSelect, killLossOptions, '-- Select Method --');
+            populateSelect(dom.detectMethodSelect, detectOptions, '-- Select Method --');
+        }
+
+        /** Populates the vehicle category dropdown. */
+        function populateVehicleCategorySelect() {
+             const categoryOptions = VEHICLE_CATEGORIES.map(cat => ({
+                value: cat,
+                text: cat.charAt(0).toUpperCase() + cat.slice(1) // Capitalize first letter
+            }));
+            populateSelect(dom.newVehicleCategorySelect, categoryOptions, '-- Select Category --');
+        }
+
+        // --- UI Navigation and Page/Step Visibility ---
+
+        /**
+         * Controls which major page or form step is visible and handles scrolling.
+         * @param {number|'MAIN'|'STATS'|'PROFILE'|'AWARDS'} target - The step number (1-4) or page name.
+         */
+        function showPageOrStep(target) {
+            const targetPage = typeof target === 'string' ? target : 'MAIN';
+            const targetStep = typeof target === 'number' ? target : null;
+
+            state.ui.currentPage = targetPage;
+            state.ui.currentStep = targetStep || 1; // Default to step 1 if showing MAIN page
+
+            // Determine the element to scroll into view
+            let elementToScroll = null;
+
+            // Toggle visibility of main content vs specific pages
+            const isMainView = targetPage === 'MAIN';
+            dom.mainTitle?.classList.toggle('hidden', !isMainView);
+            dom.mainContentDiv?.classList.toggle('hidden', !isMainView);
+
+            if (dom.playerStatsPage) {
+                dom.playerStatsPage.classList.toggle('hidden', targetPage !== 'STATS');
+                if(targetPage === 'STATS') elementToScroll = dom.playerStatsPage;
+            }
+            if (dom.playerProfilePage) {
+                dom.playerProfilePage.classList.toggle('hidden', targetPage !== 'PROFILE');
+                 if(targetPage === 'PROFILE') elementToScroll = dom.playerProfilePage;
+            }
+            if (dom.awardsListPage) {
+                dom.awardsListPage.classList.toggle('hidden', targetPage !== 'AWARDS');
+                 if(targetPage === 'AWARDS') elementToScroll = dom.awardsListPage;
+            }
+
+            // Toggle visibility of specific steps within the main content
+            const stepDivs = [dom.step1Div, dom.step2Div, dom.step3Div, dom.step4Div];
+            stepDivs.forEach((div, index) => {
+                const stepNum = index + 1;
+                const shouldShow = isMainView && (stepNum === state.ui.currentStep);
+                div?.classList.toggle('hidden', !shouldShow);
+                 // If this is the step being shown in the main view, set it as the scroll target
+                if (shouldShow) {
+                    elementToScroll = div;
+                }
+            });
+
+            // Clear currently viewed player ID when navigating away from profile
+            if (targetPage !== 'PROFILE') {
+                state.modalState.currentlyViewedPlayerId = null;
+            }
+
+            // Perform scrolling after visibility changes have likely rendered
+            // Use setTimeout to allow the browser to update rendering first
+            setTimeout(() => {
+                if (elementToScroll) {
+                    elementToScroll.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                } else if (isMainView && dom.logMatchSection) {
+                    // Fallback for main view if no specific step div found (e.g., coming back from another page)
+                     dom.logMatchSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                } else {
+                    // Default scroll to top if no specific element identified
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+            }, 50); // Small delay
+
+            console.log(`Navigated to Page: ${state.ui.currentPage}, Step: ${state.ui.currentStep}`);
+        }
+
+
+        // --- Event Handlers ---
+
+        /** Handles adding a new player. */
+        function handleAddPlayer() {
+            const name = dom.newPlayerNameInput.value.trim();
+            const imageUrl = dom.newPlayerImageUrlInput.value.trim();
+            if (!name) {
+                showMessage('Please enter a player name.', 'warning');
+                return;
+            }
+            // Check for duplicate name (case-insensitive)
+            if (Object.values(state.players).some(p => p.name.toLowerCase() === name.toLowerCase())) {
+                showMessage('Player name already exists.', 'error');
+                return;
+            }
+            const newPlayerId = generateUniqueId('player');
+            state.players[newPlayerId] = {
+                id: newPlayerId, name: name, pcs: 0, flags: 0, rewards: [],
+                imageUrl: imageUrl || null, imagePosition: '50% 50%'
+            };
+            dom.newPlayerNameInput.value = '';
+            dom.newPlayerImageUrlInput.value = '';
+            saveState();
+            updatePlayerList();
+            populateManualAwardUI(); // Update dropdown for manual grant
+            showMessage(`Player "${name}" added.`, 'success');
+        }
+
+        /** Handles adding a new vehicle type. */
+        function handleAddVehicleType() {
+            const name = dom.newVehicleNameInput.value.trim();
+            const category = dom.newVehicleCategorySelect.value;
+            const isAi = dom.newVehicleIsAiCheckbox.checked;
+            if (!name) { showMessage('Please enter a vehicle type name.', 'warning'); return; }
+            if (!category) { showMessage('Please select a vehicle category.', 'warning'); return; }
+            // Check for duplicate name (case-insensitive)
+            if (Object.values(state.vehicles).some(v => v.name.toLowerCase() === name.toLowerCase())) {
+                showMessage('Vehicle type name already exists.', 'error'); return;
+            }
+            const newVehicleId = generateUniqueId('vtype');
+            state.vehicles[newVehicleId] = { id: newVehicleId, name: name, isAi: isAi, category: category };
+            dom.newVehicleNameInput.value = '';
+            dom.newVehicleCategorySelect.value = '';
+            dom.newVehicleIsAiCheckbox.checked = false;
+            saveState();
+            updateVehicleList();
+            updateVehicleTypeSelects();
+            showMessage(`Vehicle Type "${name}" [${category}] added ${isAi ? '(AI)' : ''}.`, 'success');
+        }
+
+        /** Handles adding a selected vehicle type to the current match (Step 1). */
+        function handleAddVehicleToMatch(faction) {
+            const select = faction === 'Allies' ? dom.alliesVehicleSelect : dom.axisVehicleSelect;
+            const vehicleTypeId = select.value;
+            if (!vehicleTypeId) { showMessage('Please select a vehicle type.', 'warning'); return; }
+
+            const vehicleType = state.vehicles[vehicleTypeId];
+            if (!vehicleType) { showMessage('Error: Vehicle type not found.', 'error'); return; }
+
+            const uniqueId = generateUniqueId(faction.toLowerCase());
+            let vehicleName = vehicleType.name;
+
+            // Auto-number AI convoys
+            if (vehicleType.isAi && vehicleType.category === 'convoy') {
+                state.globalStats.lastConvoyNum = (state.globalStats.lastConvoyNum || 0) + 1;
+                vehicleName = `${vehicleType.name} ${state.globalStats.lastConvoyNum}`;
+                // No need to save state here, will be saved on match submission
+            }
+
+            const vehicleInstance = {
+                uniqueId: uniqueId, typeId: vehicleTypeId, name: vehicleName,
+                isAi: vehicleType.isAi, crew: []
+            };
+
+            if (faction === 'Allies') state.currentMatch.alliesVehicles.push(vehicleInstance);
+            else state.currentMatch.axisVehicles.push(vehicleInstance);
+
+            renderVehiclesInMatchLists(); // Update UI
+            select.value = ''; // Reset dropdown
+        }
+
+        /** Handles removing a vehicle from the current match (Step 1). */
+        function handleRemoveVehicleFromMatch(faction, index) {
+            const vehiclesInList = faction === 'Allies' ? state.currentMatch.alliesVehicles : state.currentMatch.axisVehicles;
+            if (index < 0 || index >= vehiclesInList.length) return;
+
+            const removedVehicle = vehiclesInList[index];
+
+            // Remove associated events before removing vehicle
+            state.currentMatch.events = state.currentMatch.events.filter(event =>
+                event.vehicleId !== removedVehicle.uniqueId && event.creditedTo !== removedVehicle.uniqueId
+            );
+
+            // Remove vehicle from the list
+            vehiclesInList.splice(index, 1);
+
+            // Re-render the lists
+            renderVehiclesInMatchLists();
+            showMessage(`Removed ${removedVehicle.name}.`, 'info', 1500);
+        }
+
+        /** Handles changes to the editable vehicle name input in Step 1. */
+        function handleVehicleNameChange(event, faction, index) {
+            const newName = event.target.value.trim();
+            const vehiclesInList = faction === 'Allies' ? state.currentMatch.alliesVehicles : state.currentMatch.axisVehicles;
+            const vehicle = vehiclesInList[index];
+            if (!vehicle) return;
+
+            const originalType = state.vehicles[vehicle.typeId];
+
+            // Prevent removing the number from AI convoys
+            if (vehicle.isAi && originalType?.category === 'convoy' && !/\d+$/.test(newName)) {
+                event.target.value = vehicle.name; // Revert input value
+                showMessage('AI Convoy name should end with its number.', 'warning');
+            } else {
+                vehicle.name = newName || `Unnamed ${faction} Vehicle`; // Update state
+            }
+        }
+
+        /** Handles clicking the 'Next' button from Step 1. */
+        function handleGoToStep2() {
+            if (state.currentMatch.alliesVehicles.length === 0 && state.currentMatch.axisVehicles.length === 0) {
+                showMessage('Please add at least one vehicle to the match.', 'warning');
+                return;
+            }
+            generateCrewAssignmentUI(); // Generate Step 2 UI
+            showPageOrStep(2);
+        }
+
+        /** Handles clicking the 'Next' button from Step 2. */
+        function handleGoToStep3() {
+            generateEventLoggingUI(); // Generate Step 3 UI
+            showPageOrStep(3);
+        }
+
+        /** Handles clicking the 'Next' button from Step 3. */
+        function handleGoToStep4() {
+            displayFinalScores(); // Calculate and display scores for Step 4
+            showPageOrStep(4);
+        }
+
+        /** Handles clicking a 'Back' button in the multi-step form. */
+        function handleGoBack(targetStep) {
+             // If going back to step 2, regenerate crew UI in case vehicles changed
+            if (targetStep === 2) {
+                generateCrewAssignmentUI();
+            }
+             // If going back to step 3, regenerate event UI
+            if (targetStep === 3) {
+                generateEventLoggingUI();
+            }
+            showPageOrStep(targetStep);
+        }
+
+        /** Handles the final submission of the match log form. */
+        function handleMatchSubmit(event) {
+            event.preventDefault(); // Prevent default form submission
+
+            // Calculate final scores and outcome one last time
+            const finalScoreData = calculateFactionScores(state.currentMatch.events, state.currentMatch.alliesVehicles, state.currentMatch.axisVehicles);
+            let finalOutcome = 'Draw';
+            if (finalScoreData.allies > finalScoreData.axis) finalOutcome = 'Allies';
+            else if (finalScoreData.axis > finalScoreData.allies) finalOutcome = 'Axis';
+
+            // Create the final match log object
+            const matchLog = {
+                matchId: generateUniqueId('match'),
+                timestamp: new Date().toISOString(),
+                // Deep copy vehicle and event data
+                alliesVehicles: JSON.parse(JSON.stringify(state.currentMatch.alliesVehicles)),
+                axisVehicles: JSON.parse(JSON.stringify(state.currentMatch.axisVehicles)),
+                events: JSON.parse(JSON.stringify(state.currentMatch.events)),
+                outcome: finalOutcome,
+                scores: { allies: finalScoreData.allies, axis: finalScoreData.axis }
+            };
+
+            // --- Calculate PCS Changes for participating players ---
+            const pcsChanges = {};
+            const allCrewsInMatch = new Set();
+            matchLog.alliesVehicles.forEach(v => v.crew.forEach(pId => allCrewsInMatch.add(pId)));
+            matchLog.axisVehicles.forEach(v => v.crew.forEach(pId => allCrewsInMatch.add(pId)));
+
+            // Helper to get category from the *final* match log data
+            const getCategoryFromMatchLog = (vehicleId) => {
+                const vehicleSetup = [...matchLog.alliesVehicles, ...matchLog.axisVehicles].find(v => v.uniqueId === vehicleId);
+                if (!vehicleSetup) return null;
+                const vehicleType = state.vehicles[vehicleSetup.typeId];
+                return vehicleType?.category || null;
+            };
+
+            // Iterate through events to calculate points for crews
+            matchLog.events.forEach(event => {
+                const actorVehicleId = event.vehicleId;
+                const actorVehicleSetup = [...matchLog.alliesVehicles, ...matchLog.axisVehicles].find(v => v.uniqueId === actorVehicleId);
+                const actorCategory = getCategoryFromMatchLog(actorVehicleId);
+                const isActorAllies = actorVehicleId?.startsWith('allies');
+
+                // Apply points to crew of the vehicle involved (loss or objective)
+                if (actorVehicleSetup && !actorVehicleSetup.isAi && actorVehicleSetup.crew.length > 0) {
+                    let pointsToApply = 0;
+                    if (event.type === 'LOSS' && actorCategory) {
+                        const scoreRule = `lose_${actorCategory.replace(' ', '_')}`;
+                        pointsToApply = (isActorAllies ? FACTION_SCORES.allies[scoreRule] : FACTION_SCORES.axis[scoreRule]) || 0;
+                        // Apply loss points to all crew members
+                        actorVehicleSetup.crew.forEach(crewMemberId => {
+                            pcsChanges[crewMemberId] = (pcsChanges[crewMemberId] || 0) + pointsToApply;
+                        });
+                    } else if (event.type === 'OBJECTIVE' && actorCategory) {
+                        if (isActorAllies && actorCategory === 'convoy') {
+                            pointsToApply = FACTION_SCORES.allies.escort_convoy_objective || 0;
+                        }
+                        // Add other objective rules here
+                        if (pointsToApply !== 0) {
+                            actorVehicleSetup.crew.forEach(crewMemberId => {
+                                pcsChanges[crewMemberId] = (pcsChanges[crewMemberId] || 0) + pointsToApply;
+                            });
+                        }
+                    }
+                }
+
+                // Apply points to player/crew credited with a kill
+                if (event.type === 'LOSS') {
+                    const creditedVehicleId = event.creditedTo; // Vehicle player was on (or the AI vehicle)
+                    const creditedPlayerId = event.creditedPlayerId; // Specific player ID, if any
+                    const lostCategory = actorCategory;
+
+                    if (creditedVehicleId && lostCategory) { // Make sure we know the source vehicle and what was destroyed
+                        const scoreRule = `destroy_${lostCategory.replace(' ', '_')}`;
+                        const creditedVehicleSetup = [...matchLog.alliesVehicles, ...matchLog.axisVehicles].find(v => v.uniqueId === creditedVehicleId);
+
+                        if (creditedVehicleSetup) { // Check if the credited vehicle exists in the match setup
+                             const creditedIsAllies = creditedVehicleId.startsWith('allies');
+                             const killPoints = (creditedIsAllies ? FACTION_SCORES.allies[scoreRule] : FACTION_SCORES.axis[scoreRule]) || 0;
+
+                            if (killPoints !== 0) {
+                                if (creditedPlayerId) {
+                                    // Apply points only to the specific player
+                                     pcsChanges[creditedPlayerId] = (pcsChanges[creditedPlayerId] || 0) + killPoints;
+                                } else if (!creditedVehicleSetup.isAi && creditedVehicleSetup.crew.length > 0) {
+                                    // Apply points to all crew members if no specific player credited and it's not AI
+                                    creditedVehicleSetup.crew.forEach(crewMemberId => {
+                                        pcsChanges[crewMemberId] = (pcsChanges[crewMemberId] || 0) + killPoints;
+                                    });
+                                }
+                                // If it's an AI vehicle that got the kill, no player PCS is awarded (handled by default)
+                            }
+                        }
+                    }
+                }
+            });
+
+
+            // Add Win Bonus
+            allCrewsInMatch.forEach(playerId => {
+                const playerFaction = matchLog.alliesVehicles.some(v => v.crew.includes(playerId)) ? 'Allies'
+                                    : matchLog.axisVehicles.some(v => v.crew.includes(playerId)) ? 'Axis' : null;
+                if (playerFaction && matchLog.outcome === playerFaction) {
+                    pcsChanges[playerId] = (pcsChanges[playerId] || 0) + PCS_WIN_BONUS;
+                }
+            });
+
+            // Apply calculated PCS Changes to the main player state
+            Object.keys(pcsChanges).forEach(playerId => {
+                if (state.players[playerId]) {
+                    const currentPcs = state.players[playerId].pcs || 0;
+                    const change = pcsChanges[playerId] || 0;
+                    state.players[playerId].pcs = Math.max(0, currentPcs + change); // Ensure PCS >= 0
+                }
+            });
+
+            state.matches.push(matchLog); // Add the completed match to history
+
+            // Check for and grant automatic awards *after* PCS changes
+            let awardsChanged = false;
+            allCrewsInMatch.forEach(playerId => {
+                if (state.players[playerId]) {
+                    const finalPlayerStats = calculatePlayerStats(playerId); // Recalculate with new match
+                    if (checkAndGrantAwards(finalPlayerStats)) { // Modifies state.players directly
+                        awardsChanged = true;
+                    }
+                }
+            });
+
+            saveState(); // Save updated state (matches, player PCS, awards)
+            updateFactionProgress();
+            updateMatchHistoryDisplay();
+            showMessage('Match logged successfully!', 'success');
+
+            // Reset current match state and UI
+            resetCurrentMatch();
+            showPageOrStep(1); // Go back to step 1
+        }
+
+        /** Resets the current match state and relevant UI parts. */
+        function resetCurrentMatch() {
+            state.currentMatch = { alliesVehicles: [], axisVehicles: [], events: [] };
+            dom.alliesVehiclesInMatchList.innerHTML = '';
+            dom.axisVehiclesInMatchList.innerHTML = '';
+            dom.crewAssignmentArea.innerHTML = '';
+            dom.performanceLoggingArea.innerHTML = '';
+            dom.finalAlliesScoreDisplay.textContent = '0';
+            dom.finalAxisScoreDisplay.textContent = '0';
+            dom.alliesScoreBreakdownList.innerHTML = '';
+            dom.axisScoreBreakdownList.innerHTML = '';
+            dom.finalOutcomeDisplay.textContent = 'Determining winner...';
+            dom.finalOutcomeDisplay.className = 'text-center text-xl font-bold mt-4 p-3 rounded bg-gray-200';
+        }
+
+        /** Handles clicking the 'View Player Stats' button. */
+        function handleViewPlayerStats() {
+            displayPlayerStats(); // Populate the stats table
+            showPageOrStep('STATS');
+        }
+
+        /** Handles clicking the 'View Awards List' button. */
+        function handleViewAwardsList() {
+            displayAwardsList();
+            showPageOrStep('AWARDS');
+        }
+
+        /** Handles clicking 'Back to Main' from Stats or Awards pages. */
+        function handleBackToMain() {
+            state.modalState.currentlyViewedPlayerId = null; // Clear player ID
+            showPageOrStep(1); // Go back to the main view (Step 1)
+        }
+
+        /** Handles clicking a player name link (in list or table) to view profile. */
+        function handleViewPlayerProfile(playerId) {
+            if (!playerId || !state.players[playerId]) {
+                 console.error('Attempted to view profile for invalid player ID:', playerId);
+                 showMessage('Could not load player data.', 'error');
+                 return;
+            }
+            console.log('Attempting to show profile for:', playerId);
+            displayPlayerProfile(playerId); // Populate and show profile page
+        }
+
+        /** Handles clicking 'Back to Stats' from the profile page. */
+        function handleBackToStats() {
+            state.modalState.currentlyViewedPlayerId = null; // Clear player ID
+            showPageOrStep('STATS');
+            displayPlayerStats(); // Re-populate stats table
+        }
+
+        /** Handles clicking the 'Delete Player' button on the profile page. */
+        function handleDeletePlayer() {
+            const playerId = state.modalState.currentlyViewedPlayerId;
+            if (!playerId || !state.players[playerId]) {
+                showMessage("No player profile active or player not found.", "error"); return;
+            }
+            const playerName = state.players[playerId].name;
+            if (confirm(`ARE YOU SURE?\nThis will permanently delete player "${playerName}" and remove them from all match crews.\nPlayer stats will be lost. This cannot be undone.`)) {
+                console.log(`Deleting player: ${playerName} (${playerId})`);
+
+                // Remove player from all match crews in history
+                state.matches.forEach(match => {
+                    match.alliesVehicles.forEach(v => { v.crew = v.crew.filter(id => id !== playerId); });
+                    match.axisVehicles.forEach(v => { v.crew = v.crew.filter(id => id !== playerId); });
+                });
+
+                // Delete player object from state
+                delete state.players[playerId];
+
+                saveState(); // Save updated players and matches
+                showMessage(`Player "${playerName}" deleted successfully.`, 'success');
+
+                // Go back to the stats page
+                showPageOrStep('STATS');
+                displayPlayerStats(); // Refresh stats view
+            }
+        }
+
+        /** Handles manually granting an award. */
+        function handleGrantAward() {
+            const playerId = dom.manualAwardPlayerSelect.value;
+            const awardName = dom.manualAwardSelect.value;
+
+            if (!playerId) { showMessage("Please select a player.", "warning"); return; }
+            if (!awardName) { showMessage("Please select an award to grant.", "warning"); return; }
+            if (!state.players[playerId]) { showMessage("Selected player not found.", "error"); return; }
+
+            const player = state.players[playerId];
+            player.rewards = player.rewards || []; // Ensure rewards array exists
+
+            if (player.rewards.includes(awardName)) {
+                showMessage(`${player.name} already has the '${awardName}' award.`, "info"); return;
+            }
+
+            player.rewards.push(awardName); // Add award name
+            saveState();
+            showMessage(`Award '${awardName}' granted to ${player.name}.`, "success");
+
+            // Reset dropdowns
+            dom.manualAwardPlayerSelect.value = "";
+            dom.manualAwardSelect.value = "";
+
+            // Refresh profile or stats view if currently active
+            if (state.modalState.currentlyViewedPlayerId === playerId && state.ui.currentPage === 'PROFILE') {
+                displayPlayerProfile(playerId);
+            }
+            if (state.ui.currentPage === 'STATS') {
+                displayPlayerStats();
+            }
+        }
+
+        /** Handles purging all application data. */
+        function handlePurgeAllData() {
+            if (confirm('ARE YOU SURE?\nThis will permanently delete ALL players, vehicles, match history, and stats.\nThis action cannot be undone.')) {
+                console.log("Purging all data...");
+                localStorage.removeItem(PLAYERS_KEY);
+                localStorage.removeItem(VEHICLES_KEY);
+                localStorage.removeItem(MATCHES_KEY);
+                localStorage.removeItem(STATS_KEY);
+                // Reset in-memory state completely
+                state = {
+                    players: {}, vehicles: {}, matches: [],
+                    globalStats: { alliesWins: 0, axisWins: 0, totalMatches: 0, lastConvoyNum: 0 },
+                    currentMatch: { alliesVehicles: [], axisVehicles: [], events: [] },
+                    modalState: { vehicleToAttributeLoss: null, vehicleToAttributeKill: null, vehicleToLogDetection: null, currentlyViewedPlayerId: null },
+                    ui: { currentStep: 1, currentPage: 'MAIN', messageTimeout: null }
+                };
+                loadState(); // Reload defaults/empty state
+                initializeUI(); // Re-initialize UI elements
+                showMessage('All data has been purged.', 'success');
+                showPageOrStep(1); // Go back to main view
+            }
+        }
+
+        /** Handles purging only match history data. */
+        function handlePurgeMatchHistory() {
+            if (confirm('ARE YOU SURE?\nThis will permanently delete ALL match history and reset overall faction scores.\nPlayer and vehicle data will NOT be affected.\nThis action cannot be undone.')) {
+                console.log("Purging match data...");
+                localStorage.removeItem(MATCHES_KEY);
+                localStorage.removeItem(STATS_KEY); // Remove overall stats derived from matches
+
+                // Reset relevant in-memory state
+                state.matches = [];
+                state.globalStats = { alliesWins: 0, axisWins: 0, totalMatches: 0, lastConvoyNum: state.globalStats.lastConvoyNum }; // Keep convoy num
+
+                saveState(); // Save the cleared matches/stats
+                updateFactionProgress();
+                updateMatchHistoryDisplay();
+                // Player stats will be recalculated next time viewed
+                showMessage('Match history has been purged.', 'success');
+                showPageOrStep(1); // Ensure user is back on main view
+            }
+        }
+
+        // --- Modal Handling ---
+
+        /**
+         * Opens a specified modal.
+         * @param {string} modalId - The ID of the modal element.
+         */
+        function openModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            } else {
+                console.error(`Modal with ID "${modalId}" not found.`);
+            }
+        }
+
+        /**
+         * Closes a specified modal.
+         * @param {string} modalId - The ID of the modal element.
+         */
+        function closeModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+            // Reset relevant modal state based on ID
+            if (modalId === 'loss-attribution-modal') state.modalState.vehicleToAttributeLoss = null;
+            if (modalId === 'kill-target-modal') state.modalState.vehicleToAttributeKill = null;
+            if (modalId === 'detection-modal') state.modalState.vehicleToLogDetection = null;
+            // No specific reset needed for image position modal state here
+        }
+
+        /** Opens the modal to attribute a vehicle loss. */
+        function openLossAttributionModal(vehicle) {
+            if (!vehicle) return;
+
+            state.modalState.vehicleToAttributeLoss = vehicle;
+            dom.lossModalVehicleName.textContent = vehicle.name;
+
+            const isLostVehicleAllies = vehicle.uniqueId.startsWith('allies');
+            const potentialKillers = (isLostVehicleAllies ? state.currentMatch.axisVehicles : state.currentMatch.alliesVehicles)
+                .sort((a, b) => a.name.localeCompare(b.name)); // Get all opponents
+
+            // Clear previous options
+            dom.lossCreditSelect.innerHTML = '<option value="">-- Unknown --</option>';
+
+            // Add Vehicle Options
+            const vehicleOptGroup = document.createElement('optgroup');
+            vehicleOptGroup.label = "Vehicles (Credit Crew)";
+            potentialKillers.forEach(v => {
+                const option = document.createElement('option');
+                option.value = v.uniqueId; // Value is vehicle uniqueId
+                option.textContent = `${v.name} (${v.uniqueId.startsWith('allies') ? 'Al' : 'Ax'}) ${v.isAi ? '(AI)' : ''}`;
+                vehicleOptGroup.appendChild(option);
+            });
+            if (potentialKillers.length > 0) {
+                dom.lossCreditSelect.appendChild(vehicleOptGroup);
+            }
+
+            // Add Player Options
+            const playerOptGroup = document.createElement('optgroup');
+            playerOptGroup.label = "Players (Credit Individual)";
+            let playersAdded = false;
+            potentialKillers.forEach(v => {
+                if (!v.isAi && v.crew && v.crew.length > 0) {
+                    v.crew.forEach(playerId => {
+                        const playerName = getPlayerName(playerId);
+                        const option = document.createElement('option');
+                        // Use a prefix to distinguish player IDs in the value
+                        option.value = `player_${playerId}`;
+                        option.textContent = `${playerName} (on ${v.name})`;
+                        // Store vehicle ID as data attribute for later use if needed
+                        option.dataset.vehicleId = v.uniqueId;
+                        playerOptGroup.appendChild(option);
+                        playersAdded = true;
+                    });
+                }
+            });
+            if (playersAdded) {
+                dom.lossCreditSelect.appendChild(playerOptGroup);
+            }
+
+
+            dom.lossMethodSelect.value = ""; // Reset method
+            openModal('loss-attribution-modal');
+        }
+
+
+        /** Confirms and logs a vehicle loss event. */
+        function handleConfirmLoss() {
+            const lostVehicle = state.modalState.vehicleToAttributeLoss;
+            if (!lostVehicle) return;
+
+            const creditedValue = dom.lossCreditSelect.value; // e.g., "vehicle_123" or "player_abc"
+            const method = dom.lossMethodSelect.value || null;
+
+            let creditedVehicleId = null;
+            let creditedPlayerId = null;
+
+            if (creditedValue.startsWith('player_')) {
+                creditedPlayerId = creditedValue.substring(7); // Extract player ID
+                // Find the vehicle this player is on *in the current match* to associate the kill source
+                const playerVehicle = [...state.currentMatch.alliesVehicles, ...state.currentMatch.axisVehicles]
+                                      .find(v => v.crew.includes(creditedPlayerId));
+                creditedVehicleId = playerVehicle ? playerVehicle.uniqueId : null; // Store vehicle ID for context
+            } else if (creditedValue) {
+                creditedVehicleId = creditedValue; // It's a vehicle ID
+            }
+
+            // Add LOSS event
+            state.currentMatch.events.push({
+                eventId: generateUniqueId('event'), timestamp: new Date().toISOString(),
+                type: 'LOSS',
+                vehicleId: lostVehicle.uniqueId, // The vehicle that was lost
+                creditedTo: creditedVehicleId, // Vehicle ID of the credited entity (player's vehicle or AI vehicle)
+                creditedPlayerId: creditedPlayerId, // Specific Player ID if credited individually, else null
+                method: method
+            });
+
+            // Update UI counters in Step 3
+            updateVehicleStatDisplay(lostVehicle.uniqueId);
+            if (creditedVehicleId) updateVehicleStatDisplay(creditedVehicleId); // Update counter for the vehicle involved
+
+            showMessage('Loss recorded.', 'info', 1500);
+            closeModal('loss-attribution-modal');
+        }
+
+
+        /** Opens the modal to confirm a kill and select the target. */
+        function openKillTargetModal(killerVehicle) {
+            // This function is no longer triggered by UI, but keep it for potential future use or direct calls
+            if (!killerVehicle) return;
+
+            state.modalState.vehicleToAttributeKill = killerVehicle;
+            dom.killModalVehicleName.textContent = killerVehicle.name;
+
+            const isKillerAllies = killerVehicle.uniqueId.startsWith('allies');
+            // Keep filtering targets that are already destroyed *in this event log*
+            const potentialTargets = (isKillerAllies ? state.currentMatch.axisVehicles : state.currentMatch.alliesVehicles)
+                .filter(v => !state.currentMatch.events.some(ev => ev.type === 'LOSS' && ev.vehicleId === v.uniqueId))
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map(v => ({
+                    value: v.uniqueId,
+                    text: `${v.name} (${v.uniqueId.startsWith('allies') ? 'Al' : 'Ax'}) ${v.isAi ? '(AI)' : ''}`
+                }));
+
+            if (potentialTargets.length === 0) {
+                populateSelect(dom.killTargetSelect, [], `${isKillerAllies ? 'No Axis' : 'No Allied'} opponents available or remaining.`);
+                dom.killTargetSelect.disabled = true;
+            } else {
+                 populateSelect(dom.killTargetSelect, potentialTargets, '-- Select Target --');
+                 dom.killTargetSelect.disabled = false;
+            }
+
+            dom.killMethodSelect.value = ""; // Reset method
+            openModal('kill-target-modal');
+        }
+
+        /** Confirms and logs a kill (as a LOSS event for the target). */
+        function handleConfirmKill() {
+            // This function is no longer triggered by UI, but keep it for potential future use or direct calls
+            const killerVehicle = state.modalState.vehicleToAttributeKill;
+            if (!killerVehicle) return;
+
+            const targetVehicleId = dom.killTargetSelect.value;
+            const method = dom.killMethodSelect.value || null;
+
+            if (!targetVehicleId) { showMessage('Please select the target vehicle.', 'warning'); return; }
+
+            // Add LOSS event for the target, crediting the killer (implicitly the crew)
+            state.currentMatch.events.push({
+                eventId: generateUniqueId('event'), timestamp: new Date().toISOString(),
+                type: 'LOSS', vehicleId: targetVehicleId, // Target is lost
+                creditedTo: killerVehicle.uniqueId, // Killer vehicle gets credit
+                creditedPlayerId: null, // No individual player specified via this modal
+                method: method
+            });
+
+            // Update UI counters
+            updateVehicleStatDisplay(killerVehicle.uniqueId);
+            updateVehicleStatDisplay(targetVehicleId);
+
+            showMessage('Kill recorded.', 'info', 1500);
+            closeModal('kill-target-modal');
+        }
+
+        /** Opens the modal to log a detection event. */
+        function openDetectionModal(vehicle) {
+            // This function is no longer triggered by UI, but keep it for potential future use or direct calls
+            if (!vehicle) return;
+            // Keep check: Prevent logging if vehicle is destroyed
+            if (state.currentMatch.events.some(ev => ev.type === 'LOSS' && ev.vehicleId === vehicle.uniqueId)) {
+                showMessage('A destroyed vehicle cannot make detections.', 'warning'); return;
+            }
+
+            state.modalState.vehicleToLogDetection = vehicle;
+            dom.detectModalVehicleName.textContent = vehicle.name;
+            dom.detectMethodSelect.value = ""; // Reset method
+            openModal('detection-modal');
+        }
+
+        /** Confirms and logs a detection event. */
+        function handleConfirmDetection() {
+             // This function is no longer triggered by UI, but keep it for potential future use or direct calls
+            const detectingVehicle = state.modalState.vehicleToLogDetection;
+            if (!detectingVehicle) return;
+
+            const method = dom.detectMethodSelect.value;
+            if (!method) { showMessage("Please select a detection method.", "warning"); return; }
+
+            // Log DETECT event
+            state.currentMatch.events.push({
+                eventId: generateUniqueId('event'), timestamp: new Date().toISOString(),
+                type: 'DETECT', vehicleId: detectingVehicle.uniqueId,
+                method: method
+            });
+
+            // No specific UI counter update in Step 3 for detections yet
+            showMessage(`Detection (${method}) logged.`, 'info', 1500);
+            console.log("Detection event logged:", state.currentMatch.events[state.currentMatch.events.length-1]); // DEBUG
+            closeModal('detection-modal');
+        }
+
+        /** Opens the modal to adjust player profile image position. */
+        function openPositionModal() {
+            const playerId = state.modalState.currentlyViewedPlayerId;
+            if (!playerId || !state.players[playerId]) {
+                console.error("Cannot open position modal: No player profile active."); return;
+            }
+            const player = state.players[playerId];
+            const currentPosition = player.imagePosition || '50% 50%';
+            const imageUrl = player.imageUrl || createPlaceholderImageUrl(player.name);
+
+            // Parse current position string (e.g., "50% 50%")
+            let [currentX, currentY] = ['50', '50'];
+            const parts = currentPosition.split(' ');
+            if (parts.length === 2) {
+                currentX = parts[0].replace('%', '');
+                currentY = parts[1].replace('%', '');
+            }
+            currentX = parseInt(currentX, 10) || 50;
+            currentY = parseInt(currentY, 10) || 50;
+
+            // Set initial state of modal elements
+            dom.positionPreviewImg.src = imageUrl;
+            dom.positionPreviewImg.style.objectPosition = currentPosition;
+            dom.positionPreviewImg.onerror = () => { dom.positionPreviewImg.src = createPlaceholderImageUrl(player.name); };
+            dom.imagePosXSlider.value = currentX;
+            dom.imagePosYSlider.value = currentY;
+            dom.imagePosXValue.textContent = `${currentX}%`;
+            dom.imagePosYValue.textContent = `${currentY}%`;
+
+            openModal('image-position-modal');
+        }
+
+        /** Updates the preview image position as sliders are moved. */
+        function updatePreviewPosition() {
+            if (!dom.positionPreviewImg || !dom.imagePosXSlider || !dom.imagePosYSlider) return;
+            const xValue = dom.imagePosXSlider.value;
+            const yValue = dom.imagePosYSlider.value;
+            dom.imagePosXValue.textContent = `${xValue}%`;
+            dom.imagePosYValue.textContent = `${yValue}%`;
+            dom.positionPreviewImg.style.objectPosition = `${xValue}% ${yValue}%`;
+        }
+
+        /** Saves the adjusted image position. */
+        function handleConfirmPosition() {
+            const playerId = state.modalState.currentlyViewedPlayerId;
+            if (!playerId || !state.players[playerId]) return;
+
+            const xValue = dom.imagePosXSlider.value;
+            const yValue = dom.imagePosYSlider.value;
+            const newPosition = `${xValue}% ${yValue}%`;
+
+            state.players[playerId].imagePosition = newPosition;
+            if (dom.profilePlayerImage) { // Update the actual profile image display
+                dom.profilePlayerImage.style.objectPosition = newPosition;
+            }
+            saveState();
+            showMessage('Image position saved.', 'success');
+            closeModal('image-position-modal');
+        }
+
+        /** Handles editing the player image URL via prompt. */
+        function handleEditImageUrl(event) {
+            event.stopPropagation(); // Prevent triggering image click listener
+            const playerId = state.modalState.currentlyViewedPlayerId;
+            if (!playerId || !state.players[playerId]) {
+                console.error("No player profile active to update image URL."); return;
+            }
+            const player = state.players[playerId];
+            const currentUrl = player.imageUrl || '';
+            const newImageUrl = prompt(`Enter new image URL for ${player.name}:`, currentUrl);
+
+            if (newImageUrl !== null) { // If user didn't cancel
+                const trimmedUrl = newImageUrl.trim();
+                player.imageUrl = trimmedUrl || null;
+                // Update profile image display immediately
+                dom.profilePlayerImage.src = trimmedUrl || createPlaceholderImageUrl(player.name);
+                dom.profilePlayerImage.onerror = () => { dom.profilePlayerImage.src = createPlaceholderImageUrl(player.name); }; // Reset onerror
+                saveState();
+                showMessage('Player image URL updated.', 'success');
+            } else {
+                showMessage('Image URL update cancelled.', 'info');
+            }
+        }
+
+        // --- Event Logging (Step 3) ---
+
+        /** Logs a simple event (like OBJECTIVE) to the current match state. */
+        function logSimpleEvent(vehicleId, eventType) {
+             // Prevent logging if vehicle is destroyed (still relevant for objectives?)
+             // Let's keep this check for objectives for now.
+            if (eventType === 'OBJECTIVE' && state.currentMatch.events.some(ev => ev.type === 'LOSS' && ev.vehicleId === vehicleId)) {
+                showMessage('A destroyed vehicle cannot complete objectives.', 'warning'); return;
+            }
+
+            if (eventType === 'OBJECTIVE') {
+                state.currentMatch.events.push({
+                    eventId: generateUniqueId('event'), timestamp: new Date().toISOString(),
+                    type: eventType, vehicleId: vehicleId, creditedTo: null, creditedPlayerId: null // Ensure creditedPlayerId is null
+                });
+                updateVehicleStatDisplay(vehicleId); // Update UI counter
+                showMessage('Objective logged.', 'info', 1500);
+            } else {
+                console.warn("logSimpleEvent called with unhandled type:", eventType);
+            }
+        }
+
+        /** Updates the K/O/L counters displayed next to the event buttons in Step 3. */
+        function updateVehicleStatDisplay(vehicleUniqueId) {
+            // Find elements - they might not exist if UI isn't rendered for Step 3
+            const killsEl = document.getElementById(`kills-count-${vehicleUniqueId}`); // Re-find Kills element
+            // const objEl = document.getElementById(`obj-count-${vehicleUniqueId}`); // Objectives counter removed from UI
+            const lossEl = document.getElementById(`loss-count-${vehicleUniqueId}`);
+
+            // Calculate stats
+            const stats = calculateVehicleStatsFromEvents(vehicleUniqueId);
+
+            // Update counters if elements exist
+            if (killsEl) killsEl.textContent = stats.kills; // Re-enable Kills update
+            if (lossEl) lossEl.textContent = stats.losses; // Update loss counter
+
+            // No need to disable buttons based on loss count anymore
+        }
+
+
+        // --- UI Generation Functions ---
+
+        /** Renders the lists of vehicles added to the current match (Step 1). */
+        function renderVehiclesInMatchLists() {
+            const lists = { Allies: dom.alliesVehiclesInMatchList, Axis: dom.axisVehiclesInMatchList };
+            const bgColors = { Allies: 'bg-blue-50', Axis: 'bg-red-50' };
+
+            for (const faction in lists) {
+                const listElement = lists[faction];
+                const vehiclesInList = faction === 'Allies' ? state.currentMatch.alliesVehicles : state.currentMatch.axisVehicles;
+                if (!listElement) continue;
+
+                listElement.innerHTML = ''; // Clear previous items
+                const fragment = document.createDocumentFragment();
+
+                vehiclesInList.forEach((vehicle, index) => {
+                    const li = document.createElement('li');
+                    li.className = `flex justify-between items-center ${bgColors[faction]} p-1 rounded`;
+                    li.dataset.faction = faction;
+                    li.dataset.index = index; // Store index for event delegation
+
+                    // Editable name input
+                    const nameInput = document.createElement('input');
+                    nameInput.type = 'text';
+                    nameInput.value = vehicle.name;
+                    nameInput.className = 'editable-vehicle-name text-sm vehicle-name-input'; // Add class for delegation
+                    nameInput.title = 'Click to edit name for this match';
+
+                    // Remove button
+                    const removeBtn = document.createElement('button');
+                    removeBtn.type = 'button';
+                    removeBtn.innerHTML = '<span class="lucide text-xs text-red-600">&#xe745;</span>'; // 'X' icon
+                    removeBtn.className = 'ml-2 flex-shrink-0 remove-vehicle-btn'; // Add class for delegation
+                    removeBtn.title = 'Remove vehicle from match';
+
+                    li.appendChild(nameInput);
+                    li.appendChild(removeBtn);
+                    fragment.appendChild(li);
+                });
+                listElement.appendChild(fragment);
+            }
+        }
+
+        /** Generates the UI for assigning crews to vehicles (Step 2). */
+        function generateCrewAssignmentUI() {
+            if (!dom.crewAssignmentArea) return;
+            dom.crewAssignmentArea.innerHTML = ''; // Clear previous UI
+
+            const playerVehicles = [...state.currentMatch.alliesVehicles, ...state.currentMatch.axisVehicles]
+                                  .filter(v => !v.isAi); // Only player-controlled vehicles
+
+            if (playerVehicles.length === 0) {
+                dom.crewAssignmentArea.innerHTML = '<p class="text-gray-500 italic">No player-controlled vehicles added to assign crews.</p>';
+                return;
+            }
+
+            const playerOptions = Object.values(state.players)
+                .map(p => ({ id: p.id, name: p.name }))
+                .sort((a, b) => a.name.localeCompare(b.name));
+
+            const fragment = document.createDocumentFragment();
+            playerVehicles.forEach(vehicle => {
+                const div = document.createElement('div');
+                div.className = 'border p-3 rounded-md bg-gray-50';
+                div.innerHTML = `<label class="block font-medium mb-2">${vehicle.name} (${vehicle.uniqueId.startsWith('allies') ? 'Allies' : 'Axis'}) Crew:</label>`;
+
+                // Multi-select container
+                const container = document.createElement('div');
+                container.className = 'multi-select-container';
+                container.dataset.vehicleId = vehicle.uniqueId; // Link to vehicle
+
+                // Selected display area
+                const selectedDisplay = document.createElement('div');
+                selectedDisplay.className = 'multi-select-selected';
+                selectedDisplay.dataset.action = 'toggleDropdown'; // For event delegation
+                renderSelectedCrew(selectedDisplay, vehicle.crew); // Initial render
+                container.appendChild(selectedDisplay);
+
+                // Options dropdown
+                const optionsDiv = document.createElement('div');
+                optionsDiv.className = 'multi-select-options';
+
+                playerOptions.forEach(player => {
+                    const label = document.createElement('label');
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.value = player.id;
+                    checkbox.checked = vehicle.crew.includes(player.id);
+                    checkbox.dataset.action = 'updateCrew'; // For event delegation
+                    checkbox.dataset.playerId = player.id;
+
+                    label.appendChild(checkbox);
+                    label.appendChild(document.createTextNode(player.name));
+                    optionsDiv.appendChild(label);
+                });
+
+                container.appendChild(optionsDiv);
+                div.appendChild(container);
+                fragment.appendChild(div);
+            });
+            dom.crewAssignmentArea.appendChild(fragment);
+        }
+
+        /** Renders the badges for selected crew members in the multi-select display. */
+        function renderSelectedCrew(displayElement, crewArray) {
+            if (!displayElement) return;
+            displayElement.innerHTML = ''; // Clear previous badges
+            if (crewArray.length === 0) {
+                displayElement.innerHTML = '<span class="text-gray-400 text-sm">Select crew... (Optional)</span>';
+                return;
+            }
+            const sortedCrew = crewArray
+                .map(id => state.players[id])
+                .filter(Boolean) // Remove undefined if player deleted
+                .sort((a, b) => a.name.localeCompare(b.name));
+
+            sortedCrew.forEach(player => {
+                const badge = document.createElement('span');
+                badge.className = 'selected-badge';
+                badge.textContent = player.name;
+                displayElement.appendChild(badge);
+            });
+        }
+
+        /** Handles toggling the multi-select dropdown visibility. */
+        function handleToggleDropdown(event) {
+            const container = event.target.closest('.multi-select-container');
+            if (!container) return;
+            const optionsDiv = container.querySelector('.multi-select-options');
+            if (!optionsDiv) return;
+
+            // Close other open dropdowns first
+            document.querySelectorAll('.multi-select-options.show').forEach(openDropdown => {
+                if (openDropdown !== optionsDiv) {
+                    openDropdown.classList.remove('show');
+                }
+            });
+            // Toggle current dropdown
+            optionsDiv.classList.toggle('show');
+        }
+
+        /** Handles updating the crew array when a checkbox changes. */
+        function handleUpdateCrew(event) {
+            const checkbox = event.target;
+            const container = checkbox.closest('.multi-select-container');
+            const vehicleId = container?.dataset.vehicleId;
+            const playerId = checkbox.dataset.playerId;
+            if (!vehicleId || !playerId) return;
+
+            const vehicle = [...state.currentMatch.alliesVehicles, ...state.currentMatch.axisVehicles]
+                           .find(v => v.uniqueId === vehicleId);
+            if (!vehicle) return;
+
+            if (checkbox.checked) {
+                if (!vehicle.crew.includes(playerId)) vehicle.crew.push(playerId);
+            } else {
+                vehicle.crew = vehicle.crew.filter(id => id !== playerId);
+            }
+
+            // Update the selected badges display
+            const selectedDisplay = container.querySelector('.multi-select-selected');
+            renderSelectedCrew(selectedDisplay, vehicle.crew);
+        }
+
+        /** Generates the UI for logging events (Step 3). */
+        function generateEventLoggingUI() {
+            if (!dom.performanceLoggingArea) return;
+            dom.performanceLoggingArea.innerHTML = ''; // Clear previous UI
+
+            const allMatchVehicles = [...state.currentMatch.alliesVehicles, ...state.currentMatch.axisVehicles];
+            if (allMatchVehicles.length === 0) {
+                dom.performanceLoggingArea.innerHTML = '<p class="text-gray-500 italic">No vehicles in match.</p>'; return;
+            }
+
+            const fragment = document.createDocumentFragment();
+            allMatchVehicles.forEach(vehicle => {
+                const div = document.createElement('div');
+                // Store vehicle ID for easier access in event delegation
+                div.className = 'border p-3 rounded-md bg-gray-50 flex flex-wrap items-center gap-x-4 gap-y-2';
+                div.dataset.vehicleId = vehicle.uniqueId;
+
+                const nameSpan = document.createElement('h5');
+                nameSpan.className = 'font-medium w-full md:w-auto md:flex-grow mb-2 md:mb-0';
+                nameSpan.textContent = `${vehicle.name} (${vehicle.uniqueId.startsWith('allies') ? 'Allies' : 'Axis'}) ${vehicle.isAi ? '(AI)' : ''}`;
+                div.appendChild(nameSpan);
+
+                const stats = calculateVehicleStatsFromEvents(vehicle.uniqueId);
+
+                // Container for stats and buttons
+                const statsContainer = document.createElement('div');
+                statsContainer.className = 'flex items-center space-x-3 flex-wrap';
+
+                // Generate HTML for stats and buttons - Kills and Loss counters + Loss button
+                statsContainer.innerHTML = `
+                    <span class="text-sm">K: <strong id="kills-count-${vehicle.uniqueId}">${stats.kills}</strong></span>
+                    <span class="text-sm ml-2">L: <strong id="loss-count-${vehicle.uniqueId}">${stats.losses}</strong></span>
+                    <button type="button" data-action="openLossModal" id="loss-btn-${vehicle.uniqueId}" class="event-btn loss-btn">+Loss</button>
+                `;
+                // Removed: Obj, Detect buttons and counters
+
+                div.appendChild(statsContainer);
+                fragment.appendChild(div);
+
+                // Update button states immediately after adding to DOM
+                 updateVehicleStatDisplay(vehicle.uniqueId);
+            });
+             dom.performanceLoggingArea.appendChild(fragment);
+        }
+
+        /** Displays the final scores and outcome in Step 4. */
+        function displayFinalScores() {
+            const scoreData = calculateFactionScores(state.currentMatch.events, state.currentMatch.alliesVehicles, state.currentMatch.axisVehicles);
+
+            dom.finalAlliesScoreDisplay.textContent = scoreData.allies;
+            dom.finalAxisScoreDisplay.textContent = scoreData.axis;
+
+            const renderBreakdown = (listElement, logArray) => {
+                listElement.innerHTML = logArray.map(log => `<li>${log}</li>`).join('') || '<li class="italic text-gray-500">No scoring events</li>';
+            };
+            renderBreakdown(dom.alliesScoreBreakdownList, scoreData.alliesLog);
+            renderBreakdown(dom.axisScoreBreakdownList, scoreData.axisLog);
+
+            let outcomeText = ''; let outcomeBg = 'bg-gray-200';
+            if (scoreData.allies > scoreData.axis) { outcomeText = 'Allies Win!'; outcomeBg = 'bg-blue-200 text-allies'; }
+            else if (scoreData.axis > scoreData.allies) { outcomeText = 'Axis Win!'; outcomeBg = 'bg-red-200 text-axis'; }
+            else { outcomeText = 'Draw!'; outcomeBg = 'bg-gray-200 text-neutral-DEFAULT'; }
+
+            dom.finalOutcomeDisplay.textContent = outcomeText;
+            dom.finalOutcomeDisplay.className = `text-center text-xl font-bold mt-4 p-3 rounded ${outcomeBg}`;
+        }
+
+        /** Displays the full list of available awards. */
+        function displayAwardsList() {
+            if (!dom.awardsListDisplay) return;
+            dom.awardsListDisplay.innerHTML = ''; // Clear previous content
+
+            const awardsByCategory = {};
+            Object.values(AWARDS_DEFINITIONS).forEach(award => {
+                awardsByCategory[award.category] = awardsByCategory[award.category] || [];
+                awardsByCategory[award.category].push(award);
+            });
+
+            const sortedCategories = Object.keys(awardsByCategory).sort();
+            const fragment = document.createDocumentFragment();
+
+            sortedCategories.forEach(category => {
+                const categoryDiv = document.createElement('div');
+                categoryDiv.className = 'mb-6';
+                categoryDiv.innerHTML = `<h3 class="text-lg font-semibold mb-2 border-b pb-1">${category}</h3>`;
+
+                awardsByCategory[category].sort((a, b) => a.name.localeCompare(b.name));
+                awardsByCategory[category].forEach(award => {
+                    const awardDiv = document.createElement('div');
+                    awardDiv.className = 'flex items-start gap-3 mb-2 p-2 rounded hover:bg-gray-50';
+                    const imageUrl = award.imageUrl || DEFAULT_AWARD_IMAGE_URL;
+                    const typeText = award.isAutomatic ? ' (Automatic)' : ' (Manual)';
+                    const typeColor = award.isAutomatic ? 'text-green-600' : 'text-purple-600';
+
+                    awardDiv.innerHTML = `
+                        <img src="${imageUrl}" alt="${award.name}" class="award-image flex-shrink-0 mt-1" onerror="this.src='${DEFAULT_AWARD_IMAGE_URL}'">
+                        <div>
+                            <p class="font-medium">${award.name}<span class="text-xs font-semibold ${typeColor}">${typeText}</span></p>
+                            <p class="text-sm text-gray-600">${award.description}</p>
+                        </div>
+                    `;
+                    categoryDiv.appendChild(awardDiv);
+                });
+                fragment.appendChild(categoryDiv);
+            });
+            dom.awardsListDisplay.appendChild(fragment);
+        }
+
+        /** Display Player Stats in the table on the stats page. */
+        function displayPlayerStats() {
+            if (!dom.playerStatsTableBody) return;
+            dom.playerStatsTableBody.innerHTML = ''; // Clear previous rows
+
+            const playerArr = Object.values(state.players)
+                .map(p => calculatePlayerStats(p.id)) // Calculate stats
+                .filter(Boolean) // Remove nulls
+                .sort((a, b) => a.name.localeCompare(b.name)); // Sort by name
+
+            if (playerArr.length === 0) {
+                dom.playerStatsTableBody.innerHTML = '<tr><td colspan="9" class="text-center italic text-gray-500 py-4">No players.</td></tr>';
+                return;
+            }
+
+            const fragment = document.createDocumentFragment();
+            playerArr.forEach(stats => {
+                const tr = document.createElement('tr');
+                tr.className = 'bg-white border-b hover:bg-gray-50';
+
+                // Rewards HTML with small images
+                const rewardsHtml = (stats.rewards || [])
+                    .sort((a, b) => a.localeCompare(b)) // Sort rewards alphabetically
+                    .map(rewardName => {
+                        const awardDef = Object.values(AWARDS_DEFINITIONS).find(def => def.name === rewardName);
+                        const imageUrl = awardDef?.imageUrl || DEFAULT_AWARD_IMAGE_URL;
+                        const description = awardDef ? awardDef.description : 'Unknown Award';
+                        return `<img src="${imageUrl}" alt="${rewardName}" title="${rewardName}: ${description}" class="award-image-small" onerror="this.src='${DEFAULT_AWARD_IMAGE_URL}'">`;
+                    }).join('');
+
+                // Player Name Cell (Clickable)
+                const nameCell = document.createElement('td');
+                nameCell.className = 'px-4 py-2 whitespace-nowrap';
+                const nameLink = document.createElement('button');
+                nameLink.type = 'button';
+                nameLink.className = 'player-name-link text-left';
+                nameLink.textContent = stats.name;
+                nameLink.dataset.playerId = stats.id; // For click handling
+                nameCell.appendChild(nameLink);
+                tr.appendChild(nameCell);
+
+                // Other Stats Cells
+                tr.innerHTML += `
+                    <td class="px-4 py-2 text-center font-bold">${Math.round(stats.pcs)}</td>
+                    <td class="px-4 py-2 text-center">${stats.matchesPlayed}</td>
+                    <td class="px-4 py-2 text-center">${stats.wins}/${stats.losses}/${stats.draws}</td>
+                    <td class="px-4 py-2 text-center">${stats.affinityAllies}%/${stats.affinityAxis}%</td>
+                    <td class="px-4 py-2 text-center">${stats.vehicleKillsContributed}</td>
+                    <td class="px-4 py-2 text-center">${stats.vehicleObjectivesContributed}</td>
+                    <td class="px-4 py-2 text-center">${stats.vehicleLossesSuffered}</td>
+                    <td class="px-4 py-2 whitespace-nowrap">${rewardsHtml || '<span class="text-xs italic">None</span>'}</td>
+                `;
+                fragment.appendChild(tr);
+            });
+            dom.playerStatsTableBody.appendChild(fragment);
+        }
+
+        /** Displays the profile page for a specific player. */
+        function displayPlayerProfile(playerId) {
+            state.modalState.currentlyViewedPlayerId = playerId; // Store current player
+            const stats = calculatePlayerStats(playerId); // Calculate comprehensive stats
+            if (!stats) { showMessage('Could not load player data.', 'error'); return; }
+
+            // Populate profile elements
+            dom.profilePlayerName.textContent = stats.name;
+            const imageUrl = stats.imageUrl || createPlaceholderImageUrl(stats.name);
+            dom.profilePlayerImage.src = imageUrl;
+            dom.profilePlayerImage.style.objectPosition = stats.imagePosition || '50% 50%';
+            dom.profilePlayerImage.onerror = () => { dom.profilePlayerImage.src = createPlaceholderImageUrl(stats.name); };
+
+            dom.profilePlayerPcs.textContent = Math.round(stats.pcs);
+            dom.profilePlayerMatches.textContent = stats.matchesPlayed;
+            dom.profilePlayerWins.textContent = stats.wins;
+            dom.profilePlayerLosses.textContent = stats.losses;
+            dom.profilePlayerDraws.textContent = stats.draws;
+            dom.profilePlayerAlliesAffinity.textContent = `Allies: ${stats.affinityAllies}%`;
+            dom.profilePlayerAxisAffinity.textContent = `Axis: ${stats.affinityAxis}%`;
+            dom.profilePlayerKills.textContent = stats.vehicleKillsContributed;
+            dom.profilePlayerObjectives.textContent = stats.vehicleObjectivesContributed;
+            dom.profilePlayerVLosses.textContent = stats.vehicleLossesSuffered;
+
+            // Display Award Images
+            dom.profilePlayerRewards.innerHTML = ''; // Clear previous
+            if (stats.rewards && stats.rewards.length > 0) {
+                stats.rewards.sort((a, b) => a.localeCompare(b)); // Sort
+                stats.rewards.forEach(rewardName => {
+                    const awardDef = Object.values(AWARDS_DEFINITIONS).find(def => def.name === rewardName);
+                    const imgUrl = awardDef?.imageUrl || DEFAULT_AWARD_IMAGE_URL;
+                    const description = awardDef ? awardDef.description : 'Unknown Award';
+                    const rewardImg = document.createElement('img');
+                    rewardImg.src = imgUrl;
+                    rewardImg.alt = rewardName;
+                    rewardImg.title = `${rewardName}: ${description}`;
+                    rewardImg.className = 'award-image';
+                    rewardImg.onerror = () => { rewardImg.src = DEFAULT_AWARD_IMAGE_URL; };
+                    dom.profilePlayerRewards.appendChild(rewardImg);
+                });
+            } else {
+                dom.profilePlayerRewards.innerHTML = '<span class="text-xs italic text-gray-500">No rewards earned.</span>';
+            }
+
+            // Display Weapon Kill Stats
+            if (dom.profileWeaponStats) {
+                dom.profileWeaponStats.innerHTML = ''; // Clear previous stats
+                const fragment = document.createDocumentFragment();
+                let hasWeaponKills = false;
+                // Iterate through defined kill methods to ensure consistent order
+                KILL_METHODS.forEach(method => {
+                    // Use a normalized key for the stats object (e.g., 'Deck Gun' -> 'DeckGun')
+                    const methodKey = method.replace(/[\s/]/g, ''); // Remove spaces and slashes
+                    const count = stats.killsByMethod[methodKey] || 0;
+                    if (count > 0) {
+                        hasWeaponKills = true;
+                    }
+                    // Create element for each weapon type
+                    const item = document.createElement('div');
+                    item.className = 'weapon-stat-item';
+                    item.innerHTML = `
+                        <h4>${method} Kills</h4>
+                        <p>${count}</p>
+                    `;
+                    fragment.appendChild(item);
+                });
+
+                if (!hasWeaponKills) {
+                     dom.profileWeaponStats.innerHTML = '<p class="text-sm italic text-gray-500 col-span-full text-center">No kills recorded by specific weapon types.</p>';
+                } else {
+                     dom.profileWeaponStats.appendChild(fragment);
+                }
+            }
+
+            showPageOrStep('PROFILE'); // Show the profile page
+        }
+
+
+        // --- Calculation Functions ---
+
+        /** Calculates Kills, Objectives, Losses for a vehicle based on current match events. */
+        function calculateVehicleStatsFromEvents(vehicleUniqueId) {
+            let kills = 0, objectives = 0, losses = 0;
+            state.currentMatch.events.forEach(event => {
+                if (event.type === 'OBJECTIVE' && event.vehicleId === vehicleUniqueId) objectives++;
+                if (event.type === 'LOSS' && event.vehicleId === vehicleUniqueId) losses++;
+                if (event.type === 'LOSS' && event.creditedTo === vehicleUniqueId) kills++;
+            });
+            return { kills, objectives, losses };
+        }
+
+        /** Calculates final faction scores and generates log strings for the breakdown. */
+        function calculateFactionScores(events, alliesSetup, axisSetup) {
+            let alliesScore = 0; let axisScore = 0;
+            const alliesLog = []; const axisLog = [];
+
+            const getCategory = (id) => {
+                const setup = [...alliesSetup, ...axisSetup].find(v => v.uniqueId === id);
+                if (!setup) return null;
+                const type = state.vehicles[setup.typeId];
+                return type ? type.category : null;
+            };
+            const getName = (id) => {
+                const setup = [...alliesSetup, ...axisSetup].find(v => v.uniqueId === id);
+                return setup ? setup.name : 'Unknown';
+            };
+
+            events.forEach(event => {
+                const actorId = event.vehicleId;
+                const actorCategory = getCategory(actorId);
+                const actorName = getName(actorId);
+                const isActorAllies = actorId?.startsWith('allies');
+
+                if (event.type === 'LOSS') {
+                    const lostCategory = actorCategory;
+                    const lostName = actorName;
+                    const creditedId = event.creditedTo; // Vehicle ID
+                    const creditedPlayerId = event.creditedPlayerId; // Specific Player ID or null
+                    const creditedName = creditedPlayerId ? getPlayerName(creditedPlayerId) : getName(creditedId); // Use player name if available
+                    const isCreditedAllies = creditedId?.startsWith('allies');
+                    const isCreditedAxis = creditedId?.startsWith('axis');
+
+                    if (!lostCategory) { console.warn(`Skipping score for LOSS of ${lostName}, category unknown.`); return; }
+
+                    const scoreRuleLoss = `lose_${lostCategory.replace(' ', '_')}`;
+                    const scoreRuleDestroy = `destroy_${lostCategory.replace(' ', '_')}`;
+
+                    if (isActorAllies) { // Allied vehicle lost
+                        const lossPoints = FACTION_SCORES.allies[scoreRuleLoss] || 0;
+                        if (lossPoints !== 0) { alliesScore += lossPoints; alliesLog.push(`<span class="points-negative">${lossPoints}</span>: Lost ${lostCategory} (${lostName})`); }
+
+                        if (isCreditedAxis || !creditedId) { // Axis (or Unknown) gets credit
+                            const destroyPoints = FACTION_SCORES.axis[scoreRuleDestroy] || 0;
+                            if (destroyPoints !== 0) { axisScore += destroyPoints; axisLog.push(`<span class="points-positive">+${destroyPoints}</span>: Destroyed ${lostCategory} (${lostName}) by ${creditedName || 'Unknown'}`); }
+                        }
+                    } else { // Axis vehicle lost
+                        const lossPoints = FACTION_SCORES.axis[scoreRuleLoss] || 0;
+                        if (lossPoints !== 0) { axisScore += lossPoints; axisLog.push(`<span class="points-negative">${lossPoints}</span>: Lost ${lostCategory} (${lostName})`); }
+
+                        if (isCreditedAllies || !creditedId) { // Allies (or Unknown) gets credit
+                            const destroyPoints = FACTION_SCORES.allies[scoreRuleDestroy] || 0;
+                            if (destroyPoints !== 0) { alliesScore += destroyPoints; alliesLog.push(`<span class="points-positive">+${destroyPoints}</span>: Destroyed ${lostCategory} (${lostName}) by ${creditedName || 'Unknown'}`); }
+                        }
+                    }
+                } else if (event.type === 'OBJECTIVE') {
+                    if (!actorCategory) { console.warn(`Skipping score for OBJECTIVE by ${actorName}, category unknown.`); return; }
+                    if (isActorAllies && actorCategory === 'convoy') {
+                        const points = FACTION_SCORES.allies.escort_convoy_objective || 0;
+                        if (points !== 0) { alliesScore += points; alliesLog.push(`<span class="points-positive">+${points}</span>: Objective (${actorName})`); }
+                    }
+                    // Add other objective rules here
+                }
+                // Add scoring for DETECT events later if desired
+            });
+            return { allies: alliesScore, axis: axisScore, alliesLog, axisLog };
+        }
+
+
+        /** Calculates comprehensive stats for a given player ID. */
+        function calculatePlayerStats(playerId) {
+            const player = state.players[playerId];
+            if (!player) return null;
+
+            let killsContrib = 0, objectivesContrib = 0, lossesSuffered = 0;
+            let alliesMatches = 0, axisMatches = 0;
+            let wins = 0, losses = 0, draws = 0;
+            const matchesParticipated = new Set();
+            const killsByMethod = {}; // Initialize object to store kills per method
+
+            // Initialize counts for all known methods
+            KILL_METHODS.forEach(method => {
+                const methodKey = method.replace(/[\s/]/g, ''); // Normalize key
+                killsByMethod[methodKey] = 0;
+            });
+             // Add key for unknown/other explicitly
+            killsByMethod['OtherUnknown'] = 0;
+
+
+            state.matches.forEach(match => {
+                let playedInMatch = false; let factionPlayed = null;
+                const vehiclesCrewedInMatch = [];
+
+                [...match.alliesVehicles, ...match.axisVehicles].forEach(v => {
+                    if (!v.isAi && v.crew.includes(playerId)) {
+                        playedInMatch = true;
+                        factionPlayed = v.uniqueId.startsWith('allies') ? 'Allies' : 'Axis';
+                        vehiclesCrewedInMatch.push(v.uniqueId);
+                    }
+                });
+
+                if (playedInMatch) {
+                    matchesParticipated.add(match.matchId);
+                    if (factionPlayed === 'Allies') alliesMatches++; else axisMatches++;
+
+                    if (match.outcome === factionPlayed) wins++;
+                    else if (match.outcome === 'Draw') draws++;
+                    else losses++;
+
+                    (match.events || []).forEach(event => {
+                        let killCreditedToPlayer = false;
+                        // Check for individual kill credit
+                        if (event.type === 'LOSS' && event.creditedPlayerId === playerId) {
+                            killCreditedToPlayer = true;
+                        }
+                        // Check for crew kill credit (if no individual player was credited)
+                        else if (event.type === 'LOSS' && event.creditedTo && !event.creditedPlayerId && vehiclesCrewedInMatch.includes(event.creditedTo)) {
+                           killCreditedToPlayer = true;
+                        }
+
+                        if(killCreditedToPlayer) {
+                            killsContrib++;
+                            // Increment kill count for the specific method
+                            if (event.method) {
+                                const methodKey = event.method.replace(/[\s/]/g, ''); // Normalize key
+                                if (killsByMethod.hasOwnProperty(methodKey)) {
+                                    killsByMethod[methodKey]++;
+                                } else {
+                                     // Handle potential unknown methods if needed, e.g., add to 'OtherUnknown'
+                                     killsByMethod['OtherUnknown']++;
+                                }
+                            } else {
+                                // If method is not recorded, count as 'OtherUnknown'
+                                killsByMethod['OtherUnknown']++;
+                            }
+                        }
+
+                        // Check for objective contribution
+                        if (event.type === 'OBJECTIVE' && vehiclesCrewedInMatch.includes(event.vehicleId)) {
+                            objectivesContrib++;
+                        }
+                        // Check for losses suffered
+                        if (event.type === 'LOSS' && vehiclesCrewedInMatch.includes(event.vehicleId)) {
+                            lossesSuffered++;
+                        }
+                    });
+                }
+            });
+
+            const matchesPlayed = matchesParticipated.size;
+            const affinityAllies = matchesPlayed > 0 ? Math.round((alliesMatches / matchesPlayed) * 100) : 0;
+            const affinityAxis = matchesPlayed > 0 ? Math.round((axisMatches / matchesPlayed) * 100) : 0;
+
+            return {
+                ...player, // id, name, imageUrl, imagePosition, flags
+                pcs: player.pcs || 0,
+                rewards: player.rewards || [],
+                matchesPlayed, wins, losses, draws,
+                affinityAllies, affinityAxis,
+                vehicleKillsContributed: killsContrib, // Total kills
+                vehicleObjectivesContributed: objectivesContrib,
+                vehicleLossesSuffered: lossesSuffered,
+                killsByMethod: killsByMethod // Object with per-weapon counts
+            };
+        }
+
+
+        /** Calculates total kills by a specific method for a player across all matches. (Used for Awards) */
+        function calculateTotalKillsByMethod(playerId, method) {
+            let count = 0;
+            if (!method) return 0;
+            const methodLower = method.toLowerCase();
+
+            state.matches.forEach(match => {
+                const playerVehiclesInMatch = [...match.alliesVehicles, ...match.axisVehicles]
+                    .filter(v => !v.isAi && v.crew.includes(playerId))
+                    .map(v => v.uniqueId);
+
+                if (playerVehiclesInMatch.length > 0) {
+                    (match.events || []).forEach(event => {
+                        if (event.type === 'LOSS' && event.method && event.method.toLowerCase() === methodLower) {
+                             // Check if player got individual credit OR if player was in the crew that got credit
+                             if (event.creditedPlayerId === playerId ||
+                                 (event.creditedTo && !event.creditedPlayerId && playerVehiclesInMatch.includes(event.creditedTo)))
+                             {
+                                count++;
+                            }
+                        }
+                    });
+                }
+            });
+            // console.log(`Award Check: Player ${playerId} has ${count} kills with ${method}`); // Debug
+            return count;
+        }
+
+
+        // --- Award Logic ---
+
+        /** Checks if a player meets criteria for automatic awards and grants them. */
+        function checkAndGrantAwards(playerStats) {
+            if (!playerStats || !state.players[playerStats.id]) return false;
+            const player = state.players[playerStats.id];
+            let changed = false;
+
+            player.rewards = player.rewards || []; // Ensure array exists
+
+            for (const awardId in AWARDS_DEFINITIONS) {
+                const award = AWARDS_DEFINITIONS[awardId];
+                if (award.isAutomatic && !player.rewards.includes(award.name)) {
+                    let criteriaMet = false;
+                    let count = 0;
+
+                    switch (award.criteriaType) {
+                        case 'matchesPlayed':
+                            if (playerStats.matchesPlayed >= award.threshold) criteriaMet = true;
+                            break;
+                        // Combat Award Checks
+                        case 'kills_torpedo':
+                            // Use the pre-calculated value from playerStats if available
+                            count = playerStats.killsByMethod?.Torpedo || 0; // Use normalized key
+                            if (count >= award.threshold) criteriaMet = true;
+                            break;
+                        // ... Add other criteria checks (kills_deck_gun, etc.) using playerStats.killsByMethod ...
+                        default:
+                            // Handle other automatic criteria if added
+                            break;
+                    }
+
+                    if (criteriaMet) {
+                        player.rewards.push(award.name);
+                        console.log(`Award granted to ${player.name}: ${award.name}`);
+                        showMessage(`${player.name} earned the '${award.name}' award!`, 'success', 5000);
+                        changed = true;
+                    }
+                }
+            }
+            return changed; // Indicates if player.rewards was modified
+        }
+
+
+        // --- Event Listener Setup ---
+
+        /** Sets up all primary event listeners using event delegation where possible. */
+        function setupEventListeners() {
+            // Player Management
+            dom.addPlayerBtn?.addEventListener('click', handleAddPlayer);
+            dom.viewPlayerStatsBtn?.addEventListener('click', handleViewPlayerStats);
+            dom.viewAwardsBtn?.addEventListener('click', handleViewAwardsList);
+            dom.grantAwardBtn?.addEventListener('click', handleGrantAward);
+            // Use event delegation for player list clicks
+            dom.playerList?.addEventListener('click', (e) => {
+                if (e.target.matches('.player-name-link')) {
+                    handleViewPlayerProfile(e.target.dataset.playerId);
+                }
+            });
+
+            // Vehicle Management
+            dom.addVehicleBtn?.addEventListener('click', handleAddVehicleType);
+
+            // Match Log Form Navigation
+            dom.gotoStep2Btn?.addEventListener('click', handleGoToStep2);
+            dom.gotoStep3Btn?.addEventListener('click', handleGoToStep3);
+            dom.gotoStep4Btn?.addEventListener('click', handleGoToStep4);
+            dom.logMatchForm?.addEventListener('submit', handleMatchSubmit);
+            // Use delegation for back buttons
+            dom.logMatchForm?.addEventListener('click', (e) => {
+                if (e.target.matches('.nav-back-btn')) {
+                    const targetStep = parseInt(e.target.dataset.targetStep, 10);
+                    if (!isNaN(targetStep)) {
+                        handleGoBack(targetStep);
+                    }
+                }
+                // Delegation for adding vehicles in Step 1
+                if (e.target.matches('.add-vehicle-to-match-btn')) {
+                    handleAddVehicleToMatch(e.target.dataset.faction);
+                }
+            });
+             // Delegation for removing vehicles and editing names in Step 1
+            const step1ListsContainer = dom.step1Div?.querySelector('.grid'); // Container for both lists
+            step1ListsContainer?.addEventListener('click', (e) => {
+                if (e.target.closest('.remove-vehicle-btn')) {
+                    const li = e.target.closest('li');
+                    if (li) {
+                        handleRemoveVehicleFromMatch(li.dataset.faction, parseInt(li.dataset.index, 10));
+                    }
+                }
+            });
+            step1ListsContainer?.addEventListener('change', (e) => { // Use 'change' or 'blur' for input updates
+                 if (e.target.matches('.vehicle-name-input')) {
+                    const li = e.target.closest('li');
+                    if (li) {
+                        handleVehicleNameChange(e, li.dataset.faction, parseInt(li.dataset.index, 10));
+                    }
+                }
+            });
+
+
+            // Crew Assignment (Step 2) Delegation
+            dom.crewAssignmentArea?.addEventListener('click', (e) => {
+                if (e.target.dataset.action === 'toggleDropdown') {
+                    handleToggleDropdown(e);
+                }
+            });
+            dom.crewAssignmentArea?.addEventListener('change', (e) => {
+                 if (e.target.dataset.action === 'updateCrew') {
+                    handleUpdateCrew(e);
+                }
+            });
+             // Global listener to close dropdowns when clicking outside
+            document.addEventListener('click', (event) => {
+                if (!event.target.closest('.multi-select-container')) {
+                    document.querySelectorAll('.multi-select-options.show').forEach(dropdown => {
+                        dropdown.classList.remove('show');
+                    });
+                }
+            }, true); // Use capture phase
+
+            // Event Logging (Step 3) Delegation
+            dom.performanceLoggingArea?.addEventListener('click', (e) => {
+                const button = e.target.closest('button[data-action]');
+                if (!button) return;
+                const vehicleDiv = button.closest('div[data-vehicle-id]');
+                const vehicleId = vehicleDiv?.dataset.vehicleId;
+                if (!vehicleId) return;
+
+                const vehicle = [...state.currentMatch.alliesVehicles, ...state.currentMatch.axisVehicles]
+                               .find(v => v.uniqueId === vehicleId);
+                if (!vehicle) return;
+
+                // Only handle the remaining action
+                if (button.dataset.action === 'openLossModal') {
+                    openLossAttributionModal(vehicle);
+                }
+                // Removed cases for openKillModal, logObjective, openDetectModal
+            });
+
+            // Page Navigation (Back buttons)
+            dom.backToMainFromStatsBtn?.addEventListener('click', handleBackToMain);
+            dom.backToMainFromAwardsBtn?.addEventListener('click', handleBackToMain);
+            dom.backToStatsFromProfileBtn?.addEventListener('click', handleBackToStats);
+
+            // Player Profile Interactions
+            dom.deletePlayerBtn?.addEventListener('click', handleDeletePlayer);
+            dom.profilePlayerImage?.addEventListener('click', openPositionModal);
+            dom.editImageUrlBtn?.addEventListener('click', handleEditImageUrl);
+             // Use delegation for player name links in stats table
+            dom.playerStatsTableBody?.addEventListener('click', (e) => {
+                if (e.target.matches('.player-name-link')) {
+                    handleViewPlayerProfile(e.target.dataset.playerId);
+                }
+            });
+
+
+            // Modal Buttons (Only Loss modal confirmation needed now)
+            dom.confirmLossBtn?.addEventListener('click', handleConfirmLoss);
+            // Removed listeners for confirmKillBtn, confirmDetectBtn
+            dom.confirmPositionBtn?.addEventListener('click', handleConfirmPosition);
+            // Use delegation for generic close/cancel modal buttons
+            document.body.addEventListener('click', (e) => {
+                if (e.target.matches('.close-modal-btn, .cancel-modal-btn')) {
+                    const modalId = e.target.dataset.modalId;
+                    if (modalId) {
+                        closeModal(modalId);
+                    }
+                }
+            });
+
+            // Image Position Sliders
+            dom.imagePosXSlider?.addEventListener('input', updatePreviewPosition);
+            dom.imagePosYSlider?.addEventListener('input', updatePreviewPosition);
+
+            // Purge Buttons
+            dom.purgeDataBtn?.addEventListener('click', handlePurgeAllData);
+            dom.purgeMatchesBtn?.addEventListener('click', handlePurgeMatchHistory);
+        }
+
+        // --- Initialization ---
+
+        /** Initializes the entire application UI based on the current state. */
+        function initializeUI() {
+            updatePlayerList();
+            updateVehicleList();
+            updateVehicleTypeSelects();
+            populateVehicleCategorySelect(); // Populate category dropdown
+            updateFactionProgress();
+            updateMatchHistoryDisplay();
+            updateStorageUsageDisplay();
+            populateManualAwardUI();
+            populateMethodSelects(); // Populate modal method dropdowns
+            resetCurrentMatch(); // Ensure current match state is clean
+            showPageOrStep(1); // Start on Step 1 of the main page
+        }
+
+        // --- DOMContentLoaded ---
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log("DOM Loaded. Initializing app...");
+            cacheDOMElements(); // Cache elements first
+            loadState(); // Load data
+            setupEventListeners(); // Setup listeners
+            initializeUI(); // Render initial UI
+            console.log("App Initialized.");
+        });
+
+    </script>
+
+</body>
+</html>
