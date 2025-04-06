@@ -2,5 +2,6 @@
     { "id": "player_pre_1", "name": "Cmdr. Shepard", "pcs": 100, "flags": 0, "rewards": [], "imageUrl": null, "imagePosition": "50% 50%" },
     { "id": "player_pre_2", "name": "Garrus", "pcs": 85, "flags": 0, "rewards": [], "imageUrl": null, "imagePosition": "50% 50%" },
     { "id": "player_pre_3", "name": "Tali'Zorah", "pcs": 90, "flags": 0, "rewards": [], "imageUrl": null, "imagePosition": "50% 50%" },
-    { "id": "player_pre_4", "name": "Hans Gruber", "pcs": 50, "flags": 0, "rewards": [], "imageUrl": null, "imagePosition": "50% 50%" }
+    { "id": "player_pre_4", "name": "Hans Gruber", "pcs": 50, "flags": 0, "rewards": [], "imageUrl": null, "imagePosition": "50% 50%" },
+    { "id": "player_pre_5", "name": "Hans Moleman", "pcs": 10, "flags": 0, "rewards": [], "imageUrl": null, "imagePosition": "50% 50%" }
 ]
