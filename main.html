@@ -939,21 +939,36 @@
 
         /** Loads the application state from localStorage or uses preconfigured defaults. */
         function loadState() {
-            // Load players, ensuring structure and fallback
-            const storedPlayers = loadFromStorage(PLAYERS_KEY, {});
-            if (Object.keys(storedPlayers).length > 0) {
-                state.players = storedPlayers;
-                // Ensure necessary fields exist on loaded players
-                Object.values(state.players).forEach(p => {
-                    p.imagePosition = p.imagePosition || '50% 50%';
-                    p.rewards = p.rewards || [];
-                    p.pcs = p.pcs || 0; // Ensure PCS exists
+            // Attempt to load players from players.json hosted on the server
+            fetch("https://chinglebells.github.io/Convoy1943Stats/players.json")  // Replace with your actual URL
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error("Failed to load players from players.json");
+                    }
+                    return response.json();  // Parse the JSON data
+                })
+                .then(fetchedPlayers => {
+                    // Load players, ensuring structure and fallback
+                    if (Array.isArray(fetchedPlayers) && fetchedPlayers.length > 0) {
+                        state.players = {};  // Initialize the players object
+                        fetchedPlayers.forEach(p => {
+                            state.players[p.id] = { ...p };  // Store each player in the state
+                            // Ensure necessary fields exist on loaded players
+                            state.players[p.id].imagePosition = p.imagePosition || '50% 50%';
+                            state.players[p.id].rewards = p.rewards || [];
+                            state.players[p.id].pcs = p.pcs || 0; // Ensure PCS exists
+                        });
+                    } else {
+                        // Fallback to preconfigured players if fetched data is invalid or empty
+                        PRECONFIG_PLAYERS.forEach(p => { state.players[p.id] = { ...p }; });
+                    }
+                })
+                .catch(error => {
+                    console.error("Error loading player data:", error);
+                    // Use preconfigured players if fetching from the server fails
+                    PRECONFIG_PLAYERS.forEach(p => { state.players[p.id] = { ...p }; });
                 });
-            } else {
-                // Use preconfigured players if storage is empty/invalid
-                PRECONFIG_PLAYERS.forEach(p => { state.players[p.id] = { ...p }; });
-            }
-
+        
             // Load vehicles, ensuring structure and fallback
             const storedVehicles = loadFromStorage(VEHICLES_KEY, {});
             if (Object.keys(storedVehicles).length > 0) {
@@ -962,11 +977,11 @@
                 // Use preconfigured vehicles if storage is empty/invalid
                 PRECONFIG_VEHICLE_TYPES.forEach(v => { state.vehicles[v.id] = { ...v }; });
             }
-
+        
             // Load matches and global stats
             state.matches = loadFromStorage(MATCHES_KEY, []);
             state.globalStats = loadFromStorage(STATS_KEY, { alliesWins: 0, axisWins: 0, totalMatches: 0, lastConvoyNum: 0 });
-
+        
             console.log("State loaded:", state);
         }
 
