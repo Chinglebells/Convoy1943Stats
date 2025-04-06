@@ -1019,26 +1019,25 @@
                 .then(data => {
                     const sha = data.sha; // The SHA of the file
                     console.log('File SHA:', sha);
-                })
+                    fetch(`https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH_PLAYERS}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Authorization': `token ${GITHUB_TOKEN}`,
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            message: message,
+                            content: content,
+                            sha: sha,  // You need to get the SHA of the file to update it
+                        }),
+                    })
+                        .then(response => response.json())
+                        .then(data => {
+                            console.log('File updated:', data);
+                        })
+                        .catch(error => console.error('Error updating file:', error));
+                        })
                 .catch(error => console.error('Error getting file SHA:', error));
-            
-            fetch(`https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH_PLAYERS}`, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `token ${GITHUB_TOKEN}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    message: message,
-                    content: content,
-                    sha: sha,  // You need to get the SHA of the file to update it
-                }),
-            })
-                .then(response => response.json())
-                .then(data => {
-                    console.log('File updated:', data);
-                })
-                .catch(error => console.error('Error updating file:', error));
         }
 
         // --- UI Update Functions ---
