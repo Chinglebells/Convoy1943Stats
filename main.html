@@ -1253,6 +1253,8 @@
             const targetPage = typeof target === 'string' ? target : 'MAIN';
             const targetStep = typeof target === 'number' ? target : null;
 
+            updatePlayerList();
+
             state.ui.currentPage = targetPage;
             state.ui.currentStep = targetStep || 1; // Default to step 1 if showing MAIN page
 
