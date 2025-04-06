@@ -590,6 +590,11 @@
         const MATCHES_KEY = `factionTrackerMatches_${APP_VERSION}`;
         const STATS_KEY = `factionTrackerGlobalStats_${APP_VERSION}`;
 
+        const OWNER = 'Chinglebells'; // Your GitHub username
+        const REPO = 'Convoy1943Stats'; // Your repository name
+        const FILE_PATH_PLAYERS = 'players.json'; // Path to the players.json file
+        const GITHUB_TOKEN = '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'; // Your GitHub token
+
         const PCS_WIN_BONUS = 5;
         const DEFAULT_AWARD_IMAGE_URL = 'https://i.imgur.com/42uxapt.png'; // Placeholder award image
         const PLACEHOLDER_IMAGE_URL_PREFIX = 'https://placehold.co/128x128/e0e0e0/777777?text=';
@@ -939,6 +944,25 @@
 
         /** Loads the application state from localStorage or uses preconfigured defaults. */
         function loadState() {
+            loadPlayers();
+            
+            // Load vehicles, ensuring structure and fallback
+            const storedVehicles = loadFromStorage(VEHICLES_KEY, {});
+            if (Object.keys(storedVehicles).length > 0) {
+                state.vehicles = storedVehicles;
+            } else {
+                // Use preconfigured vehicles if storage is empty/invalid
+                PRECONFIG_VEHICLE_TYPES.forEach(v => { state.vehicles[v.id] = { ...v }; });
+            }
+        
+            // Load matches and global stats
+            state.matches = loadFromStorage(MATCHES_KEY, []);
+            state.globalStats = loadFromStorage(STATS_KEY, { alliesWins: 0, axisWins: 0, totalMatches: 0, lastConvoyNum: 0 });
+        
+            console.log("State loaded:", state);
+        }
+
+        function loadPlayers() {
             // Attempt to load players from players.json hosted on the server
             fetch("https://chinglebells.github.io/Convoy1943Stats/players.json")  // Replace with your actual URL
                 .then(response => {
@@ -968,31 +992,53 @@
                     // Use preconfigured players if fetching from the server fails
                     PRECONFIG_PLAYERS.forEach(p => { state.players[p.id] = { ...p }; });
                 });
-        
-            // Load vehicles, ensuring structure and fallback
-            const storedVehicles = loadFromStorage(VEHICLES_KEY, {});
-            if (Object.keys(storedVehicles).length > 0) {
-                state.vehicles = storedVehicles;
-            } else {
-                // Use preconfigured vehicles if storage is empty/invalid
-                PRECONFIG_VEHICLE_TYPES.forEach(v => { state.vehicles[v.id] = { ...v }; });
-            }
-        
-            // Load matches and global stats
-            state.matches = loadFromStorage(MATCHES_KEY, []);
-            state.globalStats = loadFromStorage(STATS_KEY, { alliesWins: 0, axisWins: 0, totalMatches: 0, lastConvoyNum: 0 });
-        
-            console.log("State loaded:", state);
         }
 
         /** Saves the current application state to localStorage. */
         function saveState() {
+            savePlayers(state.players);
             saveToStorage(PLAYERS_KEY, state.players);
             saveToStorage(VEHICLES_KEY, state.vehicles);
             saveToStorage(MATCHES_KEY, state.matches);
             saveToStorage(STATS_KEY, state.globalStats);
             updateStorageUsageDisplay(); // Update storage display after saving
             console.log("State saved.");
+        }
+
+        function savePlayers(players) {
+            const content = btoa(JSON.stringify(players, null, 2));  // Convert to base64-encoded JSON
+            const message = 'Update players data';  // Commit message
+
+            fetch(`https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH_PLAYERS}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `token ${GITHUB_TOKEN}`,
+                },
+            })
+                .then(response => response.json())
+                .then(data => {
+                    const sha = data.sha; // The SHA of the file
+                    console.log('File SHA:', sha);
+                })
+                .catch(error => console.error('Error getting file SHA:', error));
+            
+            fetch(`https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH_PLAYERS}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `token ${GITHUB_TOKEN}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    message: message,
+                    content: content,
+                    sha: sha,  // You need to get the SHA of the file to update it
+                }),
+            })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('File updated:', data);
+                })
+                .catch(error => console.error('Error updating file:', error));
         }
 
         // --- UI Update Functions ---
